@@ -153,3 +153,7 @@
 (define operand2
   (lambda (input)
     (caddr input)))
+
+
+;work on if
+;(define if
