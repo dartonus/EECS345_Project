@@ -156,4 +156,23 @@
 
 
 ;work on if
-;(define if
+;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment
+;If the condition is true the first statement needs to be evaluated.
+;If it's false then the else must be evaluated
+;However the fact that its optional may be an issue
+
+(define if
+  (lambda (state line)
+    (cond
+      ((eq? (evaluate (cadr line)) #t) (evaluate (state (cadr line))))
+      (else (evaluate (itemn (line 3)))))))
+
+
+;find the nth item in a list
+ (define itemn
+   (lambda (l n) 
+      (cond
+        ((eq? n 0) '())
+        ((eq? n 1) (car l))
+        (else (itemn (cdr l) (- n 1))))))
+        
