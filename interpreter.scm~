@@ -8,26 +8,26 @@
 
 
 ;helpers for state operations
-(define extract     
-  (lambda (m)
-    (cond ((not (pair? m)) '())
-          (else (cons (car (car m)) (extract (cdr m)))))
-  )
+(define extract			
+	(lambda (m)
+		(cond ((not (pair? m)) '())
+		      (else (cons (car (car m)) (extract (cdr m)))))
+	)
 )
 
 (define remain
-  (lambda (m)
-    (cond ((not (pair? m)) '())
-          (else (cons (cdr (car m)) (remain (cdr m)))))
-  )
+	(lambda (m)
+		(cond ((not (pair? m)) '())
+		      (else (cons (cdr (car m)) (remain (cdr m)))))
+	)
 )
 
 
 
 (define m_insert
-  (lambda (name value s)
-    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value)))))
-  )
+	(lambda (name value s)
+		(append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value)))))
+	)
 )
 
 ; m_remove has a bug in second inner list that requires a flatten, maybe to be fixed for elegance?
@@ -39,26 +39,26 @@
       (else (cons (car l) (flatten (cdr l)))))))
 
 (define m_remove
-  (lambda (name s)
-    (cond
-      ((null? s) s)
-      ((empty? (car s)) '())
-      ((eq? name (caar s)) (remain s))
-      (else (append (list (append (list (car (extract s))) (car (m_remove name (remain s))))) (list (flatten (append (cdr (extract s)) (cdr (m_remove name (remain s))))))))
-    )
-  )
+	(lambda (name s)
+		(cond
+			((null? s) s)
+			((empty? (car s)) '())
+			((eq? name (caar s)) (remain s))
+			(else (append (list (append (list (car (extract s))) (car (m_remove name (remain s))))) (list (flatten (append (cdr (extract s)) (cdr (m_remove name (remain s))))))))
+		)
+	)
 )
 
 
 (define lookup
-    (lambda (name s)
-      (cond 
-        ((null? s) "undefined")
-        ((empty? (car s)) "undefined")
-        ((eq? name (caar s)) (caadr s))
-        (else (lookup name (remain s)))
-    )
-  )
+		(lambda (name s)
+			(cond 
+				((null? s) "undefined")
+				((empty? (car s)) "undefined")
+				((eq? name (caar s)) (caadr s))
+				(else (lookup name (remain s)))
+		)
+	)
 )
 
 
@@ -67,8 +67,8 @@
 
 #|
 (define m_name
-  (lambda name
-    (list name))
+	(lambda name
+		(list name))
 )
 |#
 
@@ -76,40 +76,12 @@
 ; expressions like '(= x 5) inplementation (assignment)
 
 (define m_state
-  (lambda (expression s)
-    (if (eq? (lookup (cadr expression) s) "undefined")
-    "error"
-    (m_insert (cadr expression) (m_value (caddr expression)) (m_remove (cadr expression) s))
-    )
-  )
-)
-
-;skeleton for declaration parse, working on it
-
-(define m_declare
-  (lambda (expression s)
-    (if (eq? (car expression) 'var)
-      (if (not (null? (cddr expression)))
-        (def_with_value (cadr expression) (m_value (cddr expression)) s) ;parse "var x (things)" (what about declare booleans?)
-        (def_null (cadr expression) s);else parse "var x"
-      )
-      s
-    )
-  )
-)
-
-(define def_with_value
-  (lambda (var expression s) 
-    ((cond ((not (eq? (lookup var s) "undefined")) (begin (error 'unknown "no re-declaring") (return s))) ;no re-declaring
-          (else (m_insert var expression s))))
-  )
-)
-
-(define def_null
-  (lambda (var s)
-    ((cond ((not (eq? (lookup var s) "undefined")) (begin (error 'unknown "no re-declaring") (return s))) ;no re-declaring
-          (else (m_insert var 'null s))))
-  )
+	(lambda (expression s)
+		(if (eq? (lookup (cadr expression) s) "undefined")
+		"error"
+		(m_insert (cadr expression) (m_value (caddr expression)) (m_remove (cadr expression) s))
+		)
+	)
 )
 
 
@@ -117,11 +89,10 @@
 
 ;basic expression evaluator used in class
 
-;doesn't have hierachy yet
+;doesn't have hierachy yet?
 (define m_value
   (lambda (expression)
     (cond
-      ((eq? 'null expression) 'null) ;for declaration of a new variable
       ((number? expression) expression)
       ((eq? '+ (operator expression)) (+ (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
       ((eq? '- (operator expression)) (- (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
