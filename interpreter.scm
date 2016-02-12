@@ -5,25 +5,25 @@
 ;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
 ;or I got the idea wrong?
 
+;intializing a state variable
+(define s '(() ()))
+
+
+;this might be something we want?
+;might need set! for the state s somewhere along the line
 ;-------------------------start-----------------------------
 (define interpret
-  (lambda (parsed)
-    0)
+  (lambda (parsed s)
+      (if (not (null? (cdr parsed))) ;if the parsed list is not empty
+        (begin (perform (car parsed s)) (interpret (cdr parsed) s)) ;perform (car list) and go interpret (cdr list)
+        "done"
+      )
+    )
  )
-
-
-;could var be a boolean? can write a check
-;or we can aggregate int/float and boolean to a single evaluate function
-;return: ((eq? (car expression) 'return)(m_value (cadr expression)))
-
-
 ;-------------------------end-----------------------------
 
 
 
-
-;for debugging
-(define s '((x y z) (2 3 4)))
 
 
 ;helpers for state operations
