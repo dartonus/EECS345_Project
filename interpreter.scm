@@ -221,8 +221,8 @@
 (define ifhandler
   (lambda (state line)
     (cond
-      ((eq? (evaluate (cadr line)) #t) (evaluate (state (cadr line))))
-      (else (evaluate (itemn (line 3)))))))
+      ((eq? (perform (cadr line)) #t) (perform (state (cadr line))))
+      (else (perform (itemn (line 3)))))))
 
 
 ;find the nth item in a list
