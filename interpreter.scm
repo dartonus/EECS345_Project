@@ -203,6 +203,7 @@
       ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '&& (logicsymbol line)) (and (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
       ((eq? '|| (logicsymbol line)) (or (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
+      ((eq? '! (logicsymbol line)) (not (m_value (operand1 line) state)))
       (else (error 'unknown "unknown")))))
 
 (define logicsymbol
