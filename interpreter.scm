@@ -221,7 +221,7 @@
 (define ifhandler
   (lambda (state line)
     (cond
-      ((eq? (perform (cadr line)) #t) (perform (state (cadr line))))
+      ((eq? (evaluate (cadr line)) #t) (perform (state (cadr line))))
       (else (perform (itemn (line 3)))))))
 
 
