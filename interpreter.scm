@@ -142,11 +142,21 @@
       ((eq? 'null expression) 'null) ;for declaration of a new variable
       ((symbol? expression) (lookup expression s))
       ((number? expression) expression)
+      ((boolean? expression) expression)
+      ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
       ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '- (operator expression)) (- (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '== (operator expression)) (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '!= (operator expression)) (not (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
+      ((eq? '> (operator expression)) (> (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '>= (operator expression)) (>= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '< (operator expression)) (< (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '<= (operator expression)) (<= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '&& (operator expression)) (and (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
+      ((eq? '|| (operator expression)) (or (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
       (else (error 'unknown "unknown")))))
 
 ;prefix parser
@@ -184,6 +194,7 @@
   (lambda (line state)
     (cond
       ((number? line) line)
+      ((symbol? line) (lookup line state))
       ((eq? '== (logicsymbol line)) (eq? (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line) state) (m_value (operand2 line) state))))
       ((eq? '> (logicsymbol line)) (> (m_value (operand1 line) state) (m_value (operand2 line) state)))
@@ -211,7 +222,11 @@
     (cond
       ((eq? (car line) 'var) (m_declare line state))
       ((eq? (car line) '=) (m_state line state))
-      ((eq? (car line) 'return) (display (m_value (cadr line) state)))
+      ((eq? (car line) 'return) (cond
+                                  ((eq? (m_value (cadr line) state) #t) (display 'true))
+                                  ((eq? (m_value (cadr line) state) #f) (display 'false))
+                                  (else (display (m_value (cadr line) state)))
+                                  ))
       ((eq? (car line) 'if) (ifhandler line state))
       ((eq? (car line) 'while) (whilehandler line state)))))
 
