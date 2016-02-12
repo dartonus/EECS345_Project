@@ -205,7 +205,7 @@
   (lambda (line state)
     (cond
       ((eq? (car line) 'var) (m_declare line state))
-      ((eq? (car line) '=) )
+      ((eq? (car line) '=) (m_state line state))
       ((eq? (car line) 'return) )
       ((eq? (car line) 'if) (ifhandler state line))
       ((eq? (car line) 'while) (whilehandler line state)))))
@@ -221,7 +221,7 @@
 (define ifhandler
   (lambda (state line)
     (cond
-      ((eq? (perform (cadr line)) #t) (perform (state (cadr line))))
+      ((eq? (evaluate (cadr line)) #t) (perform (state (caddr line))))
       (else (perform (itemn (line 3)))))))
 
 
