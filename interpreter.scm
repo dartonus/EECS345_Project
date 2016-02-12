@@ -2,6 +2,25 @@
 (load "simpleParser.scm")
 (load "lex.scm")
 
+;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
+;or I got the idea wrong?
+
+;-------------------------start-----------------------------
+(define interpret
+  (lambda (parsed)
+    0)
+ )
+
+
+;could var be a boolean? can write a check
+;or we can aggregate int/float and boolean to a single evaluate function
+;return: ((eq? (car expression) 'return)(m_value (cadr expression)))
+
+
+;-------------------------end-----------------------------
+
+
+
 
 ;for debugging
 (define s '((x y z) (2 3 4)))
@@ -90,7 +109,7 @@
   (lambda (expression s)
     (if (eq? (car expression) 'var)
       (if (not (null? (cddr expression)))
-        (def_with_value (cadr expression) (m_value (cddr expression)) s) ;parse "var x (things)" (what about declare booleans?)
+        (def_with_value (cadr expression) (m_value (caddr expression)) s) ;parse "var x (things)" (what about declare booleans?)
         (def_null (cadr expression) s);else parse "var x"
       )
       s
@@ -100,19 +119,17 @@
 
 (define def_with_value
   (lambda (var expression s) 
-    ((cond ((not (eq? (lookup var s) "undefined")) (begin (error 'unknown "no re-declaring") (return s))) ;no re-declaring
-          (else (m_insert var expression s))))
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+          (else (m_insert var expression s)))
   )
 )
 
 (define def_null
   (lambda (var s)
-    ((cond ((not (eq? (lookup var s) "undefined")) (begin (error 'unknown "no re-declaring") (return s))) ;no re-declaring
-          (else (m_insert var 'null s))))
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+          (else (m_insert var 'null s)))
   )
 )
-
-
 
 
 ;basic expression evaluator used in class
