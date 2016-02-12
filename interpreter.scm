@@ -5,7 +5,6 @@
 ;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
 ;or I got the idea wrong?
 
-(define sstate '(() ()))
 
 ;this might be something we want?
 ;might need set! for the state s somewhere along the line
@@ -14,9 +13,9 @@
   (lambda (parsed s)
     (begin
       ;intializing a state variable 
-      (if (not (null? (cdr parsed))) ;if the parsed list is not empty
-        (begin (perform (car parsed) s) (interpret (cdr parsed) s)) ;perform (car list) and go interpret (cdr list)
-        (begin ("done") (set! sstate '(() ())))
+      (if (not (empty? (cdr parsed))) ;if the parsed list is not empty
+        (begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
+        (void)
       )
     )
   )
@@ -99,9 +98,7 @@
   (lambda (expression s)
     (if (eq? (lookup (cadr expression) s) "undefined")
     "error"
-      (begin (set! s (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s)))
-        (lookup (cadr expression) s)
-      )
+      (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
     )
   )
 )
@@ -112,10 +109,8 @@
   (lambda (expression s)
     (if (eq? (car expression) 'var)
       (if (not (null? (cddr expression)))
-        (begin (set! sstate (def_with_value (cadr expression) (m_value (caddr expression) s)))
-          (lookup (cadr expression) sstate)) ;parse "var x (things)" (what about declare booleans?)
-        (begin (set! sstate (def_null (cadr expression) s)) 
-          (lookup (cadr expression) sstate));else parse "var x"
+        (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+        (def_null (cadr expression) s);else parse "var x"
       )
       "not valid declare"
     )
@@ -178,7 +173,7 @@
 (define whilehandler
   (lambda (line state)
     (cond
-      ((not (eq (evaluate (cadr line) state))) (begin (perform (caddr line)) (whilehandler line state))))))
+      ((not (eq (evaluate (cadr line) state))) (begin (perform (caddr line) state) (whilehandler line state))))))
 
 ;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment (e.g., defines a variable if an "(= x 10)" segment.)
 
@@ -187,7 +182,7 @@
   (lambda (line state)
     (cond
       ((number? line) line)
-      ((eq? '= (logicsymbol line)) (eq? (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '== (logicsymbol line)) (eq? (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line) state) (m_value (operand2 line) state))))
       ((eq? '> (logicsymbol line)) (> (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line) state) (m_value (operand2 line) state)))
@@ -212,8 +207,8 @@
     (cond
       ((eq? (car line) 'var) (m_declare line state))
       ((eq? (car line) '=) (m_state line state))
-      ((eq? (car line) 'return) )
-      ((eq? (car line) 'if) (ifhandler state line))
+      ((eq? (car line) 'return) (display (m_value (cadr line) state)))
+      ((eq? (car line) 'if) (ifhandler line state))
       ((eq? (car line) 'while) (whilehandler line state)))))
 
 
@@ -225,10 +220,10 @@
 ;However the fact that its optional may be an issue
 
 (define ifhandler
-  (lambda (state line)
+  (lambda (line state)
     (cond
-      ((eq? (evaluate (cadr line)) #t) (perform (state (caddr line))))
-      (else (perform (itemn (line 4)))))))
+      ((eq? (evaluate (cadr line) state) #t) (perform ( (caddr line) state)))
+      (else (perform (itemn (line 4) state))))))
 
 
 ;find the nth item in a list
