@@ -5,20 +5,21 @@
 ;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
 ;or I got the idea wrong?
 
-;intializing a state variable
-(define s '(() ()))
-
+(define sstate '(() ()))
 
 ;this might be something we want?
 ;might need set! for the state s somewhere along the line
 ;-------------------------start-----------------------------
 (define interpret
   (lambda (parsed s)
+    (begin
+      ;intializing a state variable 
       (if (not (null? (cdr parsed))) ;if the parsed list is not empty
-        (begin (perform (car parsed s)) (interpret (cdr parsed) s)) ;perform (car list) and go interpret (cdr list)
-        "done"
+        (begin (perform (car parsed) s) (interpret (cdr parsed) s)) ;perform (car list) and go interpret (cdr list)
+        (begin ("done") (set! sstate '(() ())))
       )
     )
+  )
  )
 ;-------------------------end-----------------------------
 
@@ -45,7 +46,7 @@
 
 (define m_insert
   (lambda (name value s)
-    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value)))))
+    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value s)))))
   )
 )
 
@@ -98,7 +99,9 @@
   (lambda (expression s)
     (if (eq? (lookup (cadr expression) s) "undefined")
     "error"
-    (m_insert (cadr expression) (m_value (caddr expression)) (m_remove (cadr expression) s))
+      (begin (set! s (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s)))
+        (lookup (cadr expression) s)
+      )
     )
   )
 )
@@ -109,24 +112,26 @@
   (lambda (expression s)
     (if (eq? (car expression) 'var)
       (if (not (null? (cddr expression)))
-        (def_with_value (cadr expression) (m_value (caddr expression)) s) ;parse "var x (things)" (what about declare booleans?)
-        (def_null (cadr expression) s);else parse "var x"
+        (begin (set! sstate (def_with_value (cadr expression) (m_value (caddr expression) s)))
+          (lookup (cadr expression) sstate)) ;parse "var x (things)" (what about declare booleans?)
+        (begin (set! sstate (def_null (cadr expression) s)) 
+          (lookup (cadr expression) sstate));else parse "var x"
       )
-      s
+      "not valid declare"
     )
   )
 )
 
 (define def_with_value
   (lambda (var expression s) 
-    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
           (else (m_insert var expression s)))
   )
 )
 
 (define def_null
   (lambda (var s)
-    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
           (else (m_insert var 'null s)))
   )
 )
@@ -136,15 +141,16 @@
 
 ;doesn't have hierachy yet
 (define m_value
-  (lambda (expression)
+  (lambda (expression s)
     (cond
       ((eq? 'null expression) 'null) ;for declaration of a new variable
+      ((symbol? expression) (lookup expression s))
       ((number? expression) expression)
-      ((eq? '+ (operator expression)) (+ (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '- (operator expression)) (- (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '* (operator expression)) (* (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '/ (operator expression)) (quotient (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '% (operator expression)) (remainder (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
+      ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '- (operator expression)) (- (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       (else (error 'unknown "unknown")))))
 
 ;prefix parser
@@ -181,12 +187,12 @@
   (lambda (line state)
     (cond
       ((number? line) line)
-      ((eq? '= (logicsymbol line)) (eq? (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line)) (m_value (operand2 line)))))
-      ((eq? '> (logicsymbol line)) (> (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '< (logicsymbol line)) (< (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line)) (m_value (operand2 line))))
+      ((eq? '= (logicsymbol line)) (eq? (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line) state) (m_value (operand2 line) state))))
+      ((eq? '> (logicsymbol line)) (> (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '< (logicsymbol line)) (< (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line) state) (m_value (operand2 line) state)))
       (else (error 'unknown "unknown")))))
 
 (define logicsymbol
