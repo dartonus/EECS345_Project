@@ -168,17 +168,17 @@
 ; (cadr line) - gets the element that is second in the provided line, which should be the clause for the while loop.
 ; (caddr line) gets the third element in the provided line, which should be the procedure for the while loop.
 
-#|
+
 (define whilehandler
-  (lambda (state line)
+  (lambda (line state)
     (cond
-      ((not (eq (evaluate (cadr line)))) (begin (perform (caddr line)) (whilehandler state line))))))
-|#
+      ((not (eq (evaluate (cadr line) state))) (begin (perform (caddr line)) (whilehandler line state))))))
+
 ;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment (e.g., defines a variable if an "(= x 10)" segment.)
 
 
 (define evaluate
-  (lambda (state line)
+  (lambda (line state)
     (cond
       ((number? line) line)
       ((eq? '= (logicsymbol line)) (eq? (m_value (operand1 line)) (m_value (operand2 line))))
@@ -201,6 +201,16 @@
   (lambda (input)
     (caddr input)))
 
+(define perform
+  (lambda (line state)
+    (cond
+      ((eq? (car line) 'var) (m_declare line state))
+      ((eq? (car line) '=) )
+      ((eq? (car line) 'return) )
+      ((eq? (car line) 'if) (ifhandler state line))
+      ((eq? (car line) 'while) (whilehandler line state)))))
+
+
 
 ;work on if
 ;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment
@@ -208,7 +218,7 @@
 ;If it's false then the else must be evaluated
 ;However the fact that its optional may be an issue
 
-(define if
+(define ifhandler
   (lambda (state line)
     (cond
       ((eq? (evaluate (cadr line)) #t) (evaluate (state (cadr line))))
