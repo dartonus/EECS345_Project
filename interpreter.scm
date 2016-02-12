@@ -13,9 +13,9 @@
   (lambda (parsed s)
     (begin
       ;intializing a state variable 
-      (if (not (empty? (cdr parsed))) ;if the parsed list is not empty
+      (if (empty? (cdr parsed)) 
+        (perform (car parsed) s)
         (begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
-        (void)
       )
     )
   )
@@ -73,6 +73,7 @@
     (lambda (name s)
       (cond 
         ((null? s) "undefined")
+        ;((void? s) "undefined")
         ((empty? (car s)) "undefined")
         ((eq? name (caar s)) (caadr s))
         (else (lookup name (remain s)))
@@ -172,8 +173,9 @@
 
 (define whilehandler
   (lambda (line state)
-    (cond
-      ((not (eq (evaluate (cadr line) state))) (begin (perform (caddr line) state) (whilehandler line state))))))
+    (if (not (evaluate (cadr line) state))
+       state
+       (whilehandler line (perform (caddr line) state)))))
 
 ;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment (e.g., defines a variable if an "(= x 10)" segment.)
 
@@ -188,6 +190,8 @@
       ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '< (logicsymbol line)) (< (m_value (operand1 line) state) (m_value (operand2 line) state)))
       ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '&& (logicsymbol line)) (and (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
+      ((eq? '|| (logicsymbol line)) (or (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
       (else (error 'unknown "unknown")))))
 
 (define logicsymbol
@@ -222,8 +226,8 @@
 (define ifhandler
   (lambda (line state)
     (cond
-      ((eq? (evaluate (cadr line) state) #t) (perform ( (caddr line) state)))
-      (else (perform (itemn (line 4) state))))))
+      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
+      (else (perform (itemn line 4) state)))))
 
 
 ;find the nth item in a list
