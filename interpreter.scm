@@ -84,7 +84,7 @@
 (define m_state
   (lambda (expression s)
     (if (eq? (lookup (cadr expression) s) "undefined")
-    "error"
+      (error 'error "Use before declaration")
       (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
     )
   )
