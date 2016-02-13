@@ -2,13 +2,10 @@
 (load "simpleParser.scm")
 (load "lex.scm")
 
-;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
-;or I got the idea wrong?
+;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
-
-;this might be something we want?
-;might need set! for the state s somewhere along the line
 ;-------------------------start-----------------------------
+;Main method, runs through each sublist within the list of lists returned by parser, effectively going through the original text line-by-line.
 (define interpret
   (lambda (parsed s)
     (begin
@@ -68,7 +65,7 @@
   )
 )
 
-
+;Finds the value of a variable of a given name within our state.
 (define lookup
     (lambda (name s)
       (cond 
@@ -82,30 +79,18 @@
 )
 
 
-;I don't think we need m_name functionally, since the x  in x = 5 is parsed as 'x already
-;Maybe declaration needs it?
-
-#|
-(define m_name
-  (lambda name
-    (list name))
-)
-|#
-
-
-; expressions like '(= x 5) inplementation (assignment)
+; Assigns a value to a variable, and modifies our state accordingly.
 
 (define m_state
   (lambda (expression s)
     (if (eq? (lookup (cadr expression) s) "undefined")
-    "error"
+      (error 'error "Use before declaration")
       (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
     )
   )
 )
 
-;skeleton for declaration parse, working on it
-
+; Declares a given variable
 (define m_declare
   (lambda (expression s)
     (if (eq? (car expression) 'var)
@@ -118,6 +103,7 @@
   )
 )
 
+; If the defined variable is defined with a value, this helper assigns it a value.
 (define def_with_value
   (lambda (var expression s) 
     (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
@@ -125,6 +111,7 @@
   )
 )
 
+; If the defined variable has no value, this helper sets it up with a null value.
 (define def_null
   (lambda (var s)
     (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
@@ -133,9 +120,7 @@
 )
 
 
-;basic expression evaluator used in class
-
-;doesn't have hierachy yet
+;Modified version of the basic expression evaluator from class.
 (define m_value
   (lambda (expression s)
     (cond
@@ -164,36 +149,22 @@
       (else (error 'unknown "unknown")))))
 
 ;prefix parser
-
 (define operator
   (lambda (input)
     (car input)))
 
-#|
-(define operand1
-  (lambda (input)
-    (cadr input)))
 
-(define operand2
-  (lambda (input)
-    (caddr input)))
-|#
-
-
+; Whilehandler addresses situations of the while loop. If the condition is not met, it performs the clause and then recurs.
 ; state - the state. line - the line that the while occurs in (i.e. the segment enclosed by parentheses, starting with "while")
 ; (cadr line) - gets the element that is second in the provided line, which should be the clause for the while loop.
 ; (caddr line) gets the third element in the provided line, which should be the procedure for the while loop.
-
-
 (define whilehandler
   (lambda (line state)
     (if (not (evaluate (cadr line) state))
        state
        (whilehandler line (perform (caddr line) state)))))
 
-;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment (e.g., defines a variable if an "(= x 10)" segment.)
-
-
+; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
 (define evaluate
   (lambda (line state)
     (cond
@@ -210,6 +181,7 @@
       ((eq? '! (logicsymbol line)) (not (m_value (operand1 line) state)))
       (else (error 'unknown "unknown")))))
 
+;Definitions to avoid having to repeatedly type "car", "cadr", and "caddr" for Evaluate, and make it clear what is being grabbed in each case.
 (define logicsymbol
   (lambda (input)
     (car input)))
@@ -222,6 +194,7 @@
   (lambda (input)
     (caddr input)))
 
+;Performs the task of a given line, by calling the method that pertains to the line's opening.
 (define perform
   (lambda (line state)
     (cond
@@ -237,23 +210,13 @@
 
 
 
-;work on if
-;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment
-;If the condition is true the first statement needs to be evaluated.
-;If it's false then the else must be evaluated
-;However the fact that its optional may be an issue
-
+;Ifhandler - does its clause if the condition is met. If condition is not met, AND an else clause is present, performs the else clause.
 (define ifhandler
   (lambda (line state)
     (cond
-;<<<<<<< HEAD
-      ;((eq? (evaluate (cadr line)) #t) (perform (state (cadr line))))
-      ;(else (perform (itemn (line 3)))))))
-;=======
       ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
       ((null? (itemn line 4)) state)
       (else (perform (itemn line 4) state)))))
-;>>>>>>> origin/master
 
 
 ;find the nth item in a list
