@@ -140,12 +140,16 @@
   (lambda (expression s)
     (cond
       ((eq? 'null expression) 'null) ;for declaration of a new variable
+      ((eq? 'true expression) #t)
+      ((eq? 'false expression) #f)
       ((symbol? expression) (lookup expression s))
       ((number? expression) expression)
       ((boolean? expression) expression)
       ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
       ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '- (operator expression)) (- (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '- (operator expression)) (if (null? (cddr expression))
+                                          (- 0 (m_value (operand1 expression) s))
+                                          (- (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
       ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
       ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
