@@ -5,25 +5,25 @@
 ;write a procedural interpreter here that go through the parsed list (test.txt) using our functions
 ;or I got the idea wrong?
 
+
+;this might be something we want?
+;might need set! for the state s somewhere along the line
 ;-------------------------start-----------------------------
 (define interpret
-  (lambda (parsed)
-    0)
+  (lambda (parsed s)
+    (begin
+      ;intializing a state variable 
+      (if (empty? (cdr parsed)) 
+        (perform (car parsed) s)
+        (begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
+      )
+    )
+  )
  )
-
-
-;could var be a boolean? can write a check
-;or we can aggregate int/float and boolean to a single evaluate function
-;return: ((eq? (car expression) 'return)(m_value (cadr expression)))
-
-
 ;-------------------------end-----------------------------
 
 
 
-
-;for debugging
-(define s '((x y z) (2 3 4)))
 
 
 ;helpers for state operations
@@ -45,7 +45,7 @@
 
 (define m_insert
   (lambda (name value s)
-    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value)))))
+    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value s)))))
   )
 )
 
@@ -73,6 +73,7 @@
     (lambda (name s)
       (cond 
         ((null? s) "undefined")
+        ;((void? s) "undefined")
         ((empty? (car s)) "undefined")
         ((eq? name (caar s)) (caadr s))
         (else (lookup name (remain s)))
@@ -98,7 +99,7 @@
   (lambda (expression s)
     (if (eq? (lookup (cadr expression) s) "undefined")
     "error"
-    (m_insert (cadr expression) (m_value (caddr expression)) (m_remove (cadr expression) s))
+      (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
     )
   )
 )
@@ -109,24 +110,24 @@
   (lambda (expression s)
     (if (eq? (car expression) 'var)
       (if (not (null? (cddr expression)))
-        (def_with_value (cadr expression) (m_value (caddr expression)) s) ;parse "var x (things)" (what about declare booleans?)
+        (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
         (def_null (cadr expression) s);else parse "var x"
       )
-      s
+      "not valid declare"
     )
   )
 )
 
 (define def_with_value
   (lambda (var expression s) 
-    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
           (else (m_insert var expression s)))
   )
 )
 
 (define def_null
   (lambda (var s)
-    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (return s))) ;no re-declaring
+    (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
           (else (m_insert var 'null s)))
   )
 )
@@ -136,15 +137,30 @@
 
 ;doesn't have hierachy yet
 (define m_value
-  (lambda (expression)
+  (lambda (expression s)
     (cond
       ((eq? 'null expression) 'null) ;for declaration of a new variable
+      ((eq? 'true expression) #t)
+      ((eq? 'false expression) #f)
+      ((symbol? expression) (lookup expression s))
       ((number? expression) expression)
-      ((eq? '+ (operator expression)) (+ (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '- (operator expression)) (- (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '* (operator expression)) (* (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '/ (operator expression)) (quotient (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
-      ((eq? '% (operator expression)) (remainder (m_value (eval (operand1 expression))) (m_value (eval (operand2 expression)))))
+      ((boolean? expression) expression)
+      ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
+      ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '- (operator expression)) (if (null? (cddr expression))
+                                          (- 0 (m_value (operand1 expression) s))
+                                          (- (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
+      ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '== (operator expression)) (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '!= (operator expression)) (not (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
+      ((eq? '> (operator expression)) (> (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '>= (operator expression)) (>= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '< (operator expression)) (< (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '<= (operator expression)) (<= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+      ((eq? '&& (operator expression)) (and (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
+      ((eq? '|| (operator expression)) (or (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
       (else (error 'unknown "unknown")))))
 
 ;prefix parser
@@ -171,8 +187,9 @@
 
 (define whilehandler
   (lambda (line state)
-    (cond
-      ((not (eq (evaluate (cadr line) state))) (begin (perform (caddr line)) (whilehandler line state))))))
+    (if (not (evaluate (cadr line) state))
+       state
+       (whilehandler line (perform (caddr line) state)))))
 
 ;assumed functions: "evaluate" - checks a logical equation. "perform" - performs the action of the segment (e.g., defines a variable if an "(= x 10)" segment.)
 
@@ -181,12 +198,16 @@
   (lambda (line state)
     (cond
       ((number? line) line)
-      ((eq? '= (logicsymbol line)) (eq? (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line)) (m_value (operand2 line)))))
-      ((eq? '> (logicsymbol line)) (> (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '< (logicsymbol line)) (< (m_value (operand1 line)) (m_value (operand2 line))))
-      ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line)) (m_value (operand2 line))))
+      ((symbol? line) (lookup line state))
+      ((eq? '== (logicsymbol line)) (eq? (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '!= (logicsymbol line)) (not (eq? (m_value (operand1 line) state) (m_value (operand2 line) state))))
+      ((eq? '> (logicsymbol line)) (> (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '>= (logicsymbol line)) (>= (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '< (logicsymbol line)) (< (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '<= (logicsymbol line)) (<= (m_value (operand1 line) state) (m_value (operand2 line) state)))
+      ((eq? '&& (logicsymbol line)) (and (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
+      ((eq? '|| (logicsymbol line)) (or (evaluate (operand1 line) state) (evaluate (operand2 line) state)))
+      ((eq? '! (logicsymbol line)) (not (m_value (operand1 line) state)))
       (else (error 'unknown "unknown")))))
 
 (define logicsymbol
@@ -205,9 +226,13 @@
   (lambda (line state)
     (cond
       ((eq? (car line) 'var) (m_declare line state))
-      ((eq? (car line) '=) )
-      ((eq? (car line) 'return) )
-      ((eq? (car line) 'if) (ifhandler state line))
+      ((eq? (car line) '=) (m_state line state))
+      ((eq? (car line) 'return) (cond
+                                  ((eq? (m_value (cadr line) state) #t) (display 'true))
+                                  ((eq? (m_value (cadr line) state) #f) (display 'false))
+                                  (else (display (m_value (cadr line) state)))
+                                  ))
+      ((eq? (car line) 'if) (ifhandler line state))
       ((eq? (car line) 'while) (whilehandler line state)))))
 
 
@@ -219,10 +244,15 @@
 ;However the fact that its optional may be an issue
 
 (define ifhandler
-  (lambda (state line)
+  (lambda (line state)
     (cond
+<<<<<<< HEAD
       ((eq? (evaluate (cadr line)) #t) (perform (state (cadr line))))
       (else (perform (itemn (line 3)))))))
+=======
+      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
+      (else (perform (itemn line 4) state)))))
+>>>>>>> origin/master
 
 
 ;find the nth item in a list
