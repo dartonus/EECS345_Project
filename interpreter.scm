@@ -246,19 +246,21 @@
 (define ifhandler
   (lambda (line state)
     (cond
-<<<<<<< HEAD
-      ((eq? (evaluate (cadr line)) #t) (perform (state (cadr line))))
-      (else (perform (itemn (line 3)))))))
-=======
+;<<<<<<< HEAD
+      ;((eq? (evaluate (cadr line)) #t) (perform (state (cadr line))))
+      ;(else (perform (itemn (line 3)))))))
+;=======
       ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
+      ((null? (itemn line 4)) state)
       (else (perform (itemn line 4) state)))))
->>>>>>> origin/master
+;>>>>>>> origin/master
 
 
 ;find the nth item in a list
  (define itemn
    (lambda (l n) 
       (cond
+        ((null? l) '())
         ((eq? n 0) '())
         ((eq? n 1) (car l))
         (else (itemn (cdr l) (- n 1))))))
