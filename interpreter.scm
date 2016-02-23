@@ -1,6 +1,8 @@
 #lang racket/load
 (load "simpleParser.scm")
 (load "lex.scm")
+(load "control.scm")
+;maybe move control flow stuff into another file?
 
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
