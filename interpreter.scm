@@ -93,6 +93,24 @@
   )
 )
 
+(define lookupbox
+    (lambda (name s)
+      (if (not (layered s))
+        (cond 
+          ((null? s) "undefined")
+          ;((void? s) "undefined")
+          ((empty? (car s)) "undefined")
+          ((eq? name (caar s)) (caadr s))
+          (else (lookupbox name (remain s)))
+      )
+
+        (if (eq? "undefined" (lookupbox name (car s)))
+          (lookupbox name (cdr s))
+          (lookupbox name (car s))))
+  )
+)
+
+
 
 ; Assigns a value to a variable, and modifies our state accordingly.
 
@@ -102,20 +120,14 @@
 
 (define m_state
   (lambda (expression s)
-    (if (layered s)
-        ;if state is layered, try finding var in first layer, then the rest of the layer
-        (if (eq? (lookup (cadr expression) (car s)) "undefined")
-          (cons (car s) (m_state expression (cdr s)))
-          (cons (m_insert (cadr expression) (m_value (caddr expression) (car s)) (m_remove (cadr expression) (car s))) 
-            (m_insert (cadr expression) (m_value (caddr expression) (cdr s)) (m_remove (cadr expression) (cdr s)))))
-        ;if state is not layered
         (if (eq? (lookup (cadr expression) s) "undefined")
           (error 'error "Use before declaration")
-          (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
+          (if (layered s)
+          (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) (car s))) s)
+        (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) s)) s))
         )
       )
   )
-)
 
 ; Declares a given variable
 (define m_declare
@@ -153,6 +165,7 @@
 ;Modified version of the basic expression evaluator from class.
 (define m_value
   (lambda (expression s)
+    (if (layered s) (m_value expression (car s))
       (cond
         ((eq? 'null expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
@@ -176,7 +189,7 @@
         ((eq? '<= (operator expression)) (<= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '&& (operator expression)) (and (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
         ((eq? '|| (operator expression)) (or (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
-        (else (error 'unknown "unknown")))
+        (else (error 'unknown "unknown"))))
 
       ))
 
