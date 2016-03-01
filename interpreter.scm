@@ -1,8 +1,6 @@
 #lang racket/load
 (load "simpleParser.scm")
 (load "lex.scm")
-(load "control.scm")
-;maybe move control flow stuff into another file?
 
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
@@ -22,7 +20,12 @@
 ;-------------------------end-----------------------------
 
 
-
+(define layered
+  (lambda (state)
+    (if (empty? (car state))
+      #f
+    (list? (caar state))))
+)
 
 
 ;helpers for state operations
@@ -44,7 +47,10 @@
 
 (define m_insert
   (lambda (name value s)
-    (append (list (append (car s) (list name))) (list (append (cadr s) (list (m_value value s)))))
+    (if (layered s)
+      (cons (m_insert name value (car s)) (cdr s))
+      (append (list (append (car s) (list name))) (list (append (cadr s) (list (box (m_value value s))))))
+      )
   )
 )
 
@@ -58,50 +64,72 @@
 
 (define m_remove
   (lambda (name s)
-    (cond
-      ((null? s) s)
-      ((empty? (car s)) '())
-      ((eq? name (caar s)) (remain s))
-      (else (append (list (append (list (car (extract s))) (car (m_remove name (remain s))))) (list (flatten (append (cdr (extract s)) (cdr (m_remove name (remain s))))))))
-    )
+    (if (layered s)
+      (cons (m_remove name (car s)) (cdr s))
+      (cond
+        ((null? s) s)
+        ((empty? (car s)) '())
+        ((eq? name (caar s)) (remain s))
+        (else (append (list (append (list (car (extract s))) (car (m_remove name (remain s))))) (list (flatten (append (cdr (extract s)) (cdr (m_remove name (remain s))))))))
+      ))
   )
 )
 
 ;Finds the value of a variable of a given name within our state.
 (define lookup
     (lambda (name s)
-      (cond 
-        ((null? s) "undefined")
-        ;((void? s) "undefined")
-        ((empty? (car s)) "undefined")
-        ((eq? name (caar s)) (caadr s))
-        (else (lookup name (remain s)))
-    )
+      (if (not (layered s))
+        (cond 
+          ((null? s) "undefined")
+          ;((void? s) "undefined")
+          ((empty? (car s)) "undefined")
+          ((eq? name (caar s)) (unbox (caadr s)))
+          (else (lookup name (remain s)))
+      )
+
+        (if (eq? "undefined" (lookup name (car s)))
+          (lookup name (cdr s))
+          (lookup name (car s))))
   )
 )
 
 
 ; Assigns a value to a variable, and modifies our state accordingly.
 
+
+;almost working, need to use set-box! to change state
+;basic structure laid down
+
 (define m_state
   (lambda (expression s)
-    (if (eq? (lookup (cadr expression) s) "undefined")
-      (error 'error "Use before declaration")
-      (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
-    )
+    (if (layered s)
+        ;if state is layered, try finding var in first layer, then the rest of the layer
+        (if (eq? (lookup (cadr expression) (car s)) "undefined")
+          (cons (car s) (m_state expression (cdr s)))
+          (cons (m_insert (cadr expression) (m_value (caddr expression) (car s)) (m_remove (cadr expression) (car s))) 
+            (m_insert (cadr expression) (m_value (caddr expression) (cdr s)) (m_remove (cadr expression) (cdr s)))))
+        ;if state is not layered
+        (if (eq? (lookup (cadr expression) s) "undefined")
+          (error 'error "Use before declaration")
+          (m_insert (cadr expression) (m_value (caddr expression) s) (m_remove (cadr expression) s))
+        )
+      )
   )
 )
 
 ; Declares a given variable
 (define m_declare
   (lambda (expression s)
-    (if (eq? (car expression) 'var)
-      (if (not (null? (cddr expression)))
-        (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
-        (def_null (cadr expression) s);else parse "var x"
+    (if (layered s)
+      (cons (m_declare expression (car s)) (cdr s))
+        (if (eq? (car expression) 'var)
+          (if (not (null? (cddr expression)))
+            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+            (def_null (cadr expression) s);else parse "var x"
+          )
+          "not valid declare"
+        )
       )
-      "not valid declare"
-    )
   )
 )
 
@@ -125,30 +153,32 @@
 ;Modified version of the basic expression evaluator from class.
 (define m_value
   (lambda (expression s)
-    (cond
-      ((eq? 'null expression) 'null) ;for declaration of a new variable
-      ((eq? 'true expression) #t)
-      ((eq? 'false expression) #f)
-      ((symbol? expression) (lookup expression s))
-      ((number? expression) expression)
-      ((boolean? expression) expression)
-      ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
-      ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '- (operator expression)) (if (null? (cddr expression))
-                                          (- 0 (m_value (operand1 expression) s))
-                                          (- (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
-      ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '== (operator expression)) (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '!= (operator expression)) (not (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
-      ((eq? '> (operator expression)) (> (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '>= (operator expression)) (>= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '< (operator expression)) (< (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '<= (operator expression)) (<= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
-      ((eq? '&& (operator expression)) (and (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
-      ((eq? '|| (operator expression)) (or (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
-      (else (error 'unknown "unknown")))))
+      (cond
+        ((eq? 'null expression) 'null) ;for declaration of a new variable
+        ((eq? 'true expression) #t)
+        ((eq? 'false expression) #f)
+        ((symbol? expression) (lookup expression s))
+        ((number? expression) expression)
+        ((boolean? expression) expression)
+        ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
+        ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '- (operator expression)) (if (null? (cddr expression))
+                                            (- 0 (m_value (operand1 expression) s))
+                                            (- (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
+        ((eq? '* (operator expression)) (* (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '/ (operator expression)) (quotient (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '% (operator expression)) (remainder (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '== (operator expression)) (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '!= (operator expression)) (not (eq? (m_value (operand1 expression) s) (m_value (operand2 expression) s))))
+        ((eq? '> (operator expression)) (> (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '>= (operator expression)) (>= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '< (operator expression)) (< (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '<= (operator expression)) (<= (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
+        ((eq? '&& (operator expression)) (and (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
+        ((eq? '|| (operator expression)) (or (evaluate (operand1 expression) s) (evaluate (operand2 expression) s)))
+        (else (error 'unknown "unknown")))
+
+      ))
 
 ;prefix parser
 (define operator
@@ -199,16 +229,18 @@
 ;Performs the task of a given line, by calling the method that pertains to the line's opening.
 (define perform
   (lambda (line state)
-    (cond
-      ((eq? (car line) 'var) (m_declare line state))
-      ((eq? (car line) '=) (m_state line state))
-      ((eq? (car line) 'return) (cond
-                                  ((eq? (m_value (cadr line) state) #t) (display 'true))
-                                  ((eq? (m_value (cadr line) state) #f) (display 'false))
-                                  (else (display (m_value (cadr line) state)))
-                                  ))
-      ((eq? (car line) 'if) (ifhandler line state))
-      ((eq? (car line) 'while) (whilehandler line state)))))
+      (cond
+        ((eq? (car line) 'var) (m_declare line state))
+        ((eq? (car line) '=) (m_state line state))
+        ((eq? (car line) 'return) (cond
+                                    ((eq? (m_value (cadr line) state) #t) (display 'true))
+                                    ((eq? (m_value (cadr line) state) #f) (display 'false))
+                                    (else (display (m_value (cadr line) state)))
+                                    ))
+        ((eq? (car line) 'if) (ifhandler line state))
+        ((eq? (car line) 'while) (whilehandler line state))
+        ((eq? (car line) 'begin) (blockhandler line state)) ;block handler
+        )))
 
 
 
@@ -229,4 +261,32 @@
         ((eq? n 0) '())
         ((eq? n 1) (car l))
         (else (itemn (cdr l) (- n 1))))))
+
+
+
+
+
+
+(define blockhandler 
+	(lambda (line state) 
+		(cdr (interpret (cdr line) (cons state state)))
+	)
+)
         
+(define gotohandler (lambda (v) v))
+
+
+
+(define breakhandler (lambda (v) v))
+
+
+
+(define continuehandler (lambda (v) v))
+
+
+
+(define trycatchhandler (lambda (v) v))
+
+
+
+(define throwhandler (lambda (v) v))
