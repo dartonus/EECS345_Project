@@ -1,4 +1,13 @@
+<<<<<<< HEAD
 var x = 2;
 while (x < 100)
   x = x * 2;
+=======
+var x = 0;
+var y = 10;
+while (!(x >= y) || !(y > 25)) {
+  x = x + 2;
+  y = y + 1;
+}
+>>>>>>> origin/master
 return x;
