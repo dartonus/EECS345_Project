@@ -289,13 +289,8 @@
   (lambda (line state)
     (cond
       ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
-<<<<<<< HEAD
-      ((null? (itemn line 3)) state)
-      (else (perform (itemn line 3) state)))))
-=======
       ((null? (itemn line 4)) state)
       (else (perform (itemn line 4) state)))))
->>>>>>> origin/master
 
 
 ;find the nth item in a list
