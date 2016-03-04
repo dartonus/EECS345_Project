@@ -5,14 +5,20 @@
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
 ;-------------------------start-----------------------------
-;Main method, runs through each sublist within the list of lists returned by parser, effectively going through the original text line-by-line.
 (define interpret
+  (lambda (filename)
+    (interpreter (parser filename) '(()()))
+    )
+  )
+
+;Interpretation method, runs through each sublist within the list of lists returned by parser, effectively going through the original text line-by-line.
+(define interpreter
   (lambda (parsed s)
     (begin
       ;intializing a state variable 
       (if (empty? (cdr parsed)) 
         (perform (car parsed) s)
-        (begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
+        (begin (perform (car parsed) s) (interpreter (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
       )
     )
   )
