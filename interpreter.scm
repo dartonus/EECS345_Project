@@ -7,7 +7,7 @@
 ;-------------------------start-----------------------------
 (define interpret
   (lambda (filename)
-    (interpreter (parser filename) '(()()))
+    (interpreter (parser filename) newstate)
     )
   )
 
@@ -26,7 +26,7 @@
   )
  )
 ;-------------------------end-----------------------------
-
+(define newstate '(()()))
 
 (define layered
   (lambda (state)
