@@ -263,10 +263,22 @@
                                     (else (display (m_value (cadr line) state)))
                                     ))
         ((eq? (car line) 'if) (ifhandler line state))
-        ((eq? (car line) 'while) (whilehandler line state))
-        ((eq? (car line) 'begin) (cdr (blockhandler (cdr line) (cons state state)))) ;block handler
-        ((eq? (car line) 'continue) ())
+        ((eq? (car line) 'while) (whilehandler line state)) 
+        ((eq? (car line) 'begin) 
+          ;(call/cc ... ?
+        (cdr (blockhandler (cdr line) (cons state state)))) ;block handler
+        
 
+        ((eq? (car line) 'continue) state) ;dummy
+        ((eq? (car line) 'break) 
+          (cond
+            ((not (layered state)) (error 'error "Break must be inside a block")) 
+            ;if break is encountered, throw away current layer immediately, 
+            ;but we need to skip the remaining lines in the braces of (begin (xx) (break) (xxx))
+            ;how to implement call/cc to do exactly that?
+            (else state) ;dummy
+            )
+          )
 
         )))
 
@@ -294,7 +306,7 @@
 
 
 (define blockhandler 
-	(lambda (line s) 
+	(lambda (line s)
       (if (empty? (cdr line)) 
         (perform (car line) s)
         (blockhandler (cdr line) (perform (car line) s))
@@ -310,7 +322,13 @@
 
 
 
-(define continuehandler (lambda (v) v))
+(define continuehandler 
+  (lambda (line s)
+    (call/cc
+        (s)
+      )
+  )
+)
 
 
 
