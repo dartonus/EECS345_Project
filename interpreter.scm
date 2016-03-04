@@ -12,7 +12,8 @@
       ;intializing a state variable 
       (if (empty? (cdr parsed)) 
         (perform (car parsed) s)
-        (begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
+       ;(begin (perform (car parsed) s) (interpret (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpret (cdr list)
+       (interpret (cdr parsed) (perform (car parsed) s))
       )
     )
   )
@@ -123,8 +124,9 @@
         (if (eq? (lookup (cadr expression) s) "undefined")
           (error 'error "Use before declaration")
           (if (layered s)
-          (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) (car s))) s)
-        (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) s)) s))
+            (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) (car s))) s)
+            (begin (set-box! (lookupbox (cadr expression) s) (m_value (caddr expression) s)) s)
+          )
         )
       )
   )
@@ -245,14 +247,20 @@
       (cond
         ((eq? (car line) 'var) (m_declare line state))
         ((eq? (car line) '=) (m_state line state))
+        ;return needs revamp (immediate break)
         ((eq? (car line) 'return) (cond
+                                    ((eq? (cadr line) 'state) state)
+                                    ;above line is for debugging
                                     ((eq? (m_value (cadr line) state) #t) (display 'true))
                                     ((eq? (m_value (cadr line) state) #f) (display 'false))
                                     (else (display (m_value (cadr line) state)))
                                     ))
         ((eq? (car line) 'if) (ifhandler line state))
         ((eq? (car line) 'while) (whilehandler line state))
-        ((eq? (car line) 'begin) (blockhandler line state)) ;block handler
+        ((eq? (car line) 'begin) (cdr (blockhandler (cdr line) (cons state state)))) ;block handler
+        ((eq? (car line) 'continue) ())
+
+
         )))
 
 
@@ -278,16 +286,17 @@
 
 
 
-
-
 (define blockhandler 
-	(lambda (line state) 
-		(cdr (interpret (cdr line) (cons state state)))
-	)
-)
+	(lambda (line s) 
+      (if (empty? (cdr line)) 
+        (perform (car line) s)
+        (blockhandler (cdr line) (perform (car line) s))
+      )
+    )
+  )
+
         
 (define gotohandler (lambda (v) v))
-
 
 
 (define breakhandler (lambda (v) v))
