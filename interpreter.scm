@@ -227,7 +227,8 @@
   (lambda (line state)
     (cond
       ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
-      (else (perform (itemn line 4) state)))))
+      ((null? (itemn line 3)) state)
+      (else (perform (itemn line 3) state)))))
 
 
 ;find the nth item in a list
