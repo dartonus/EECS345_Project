@@ -24,8 +24,6 @@
           ((null? parsed) s)
           ((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue return) (cdr s)) break continue return))
           ((pair? (car parsed)) (interpreter (cdr parsed) (perform (car parsed) s break continue return) break continue return))
-          ;((empty? (cdr parsed)) (perform (car parsed) s break continue return))
-         ;(begin (perform (car parsed) s) (interpreter (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpreter (cdr list)
           (else (interpreter (cdr parsed) (perform parsed s break continue return) break continue return))
         )
       )
@@ -136,9 +134,6 @@
 
 ; Assigns a value to a variable, and modifies our state accordingly.
 
-
-;almost working, need to use set-box! to change state
-;basic structure laid down
 
 (define m_state
   (lambda (expression s)
