@@ -5,6 +5,9 @@
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
 ;-------------------------start-----------------------------
+
+;usage: ex: (interpret "test1.txt")
+
 (define interpret
   (lambda (filename)
     (call/cc (lambda (return)
@@ -28,10 +31,13 @@
       )
  )
 ;-------------------------end-----------------------------
+
+;initializations
 (define newstate '(()()))
 (define newbreak (lambda (v) v))
 (define newcontinue (lambda (v) v))
 
+;helper to determine whether a state is layered (currently in a block)
 (define layered
   (lambda (state)
     (cond 
@@ -108,6 +114,7 @@
   )
 )
 
+;the lookup version that returns the box rather than the value
 (define lookupbox
     (lambda (name s)
       (if (not (layered s))
@@ -225,6 +232,7 @@
           (if (not (evaluate (cadr line) state))
             (break state)
             (whilehandler line (call/cc (lambda (continue)(perform (caddr line) state break continue return))) return))))))
+;while with call/cc of break and continue passed from perform
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
 (define evaluate
@@ -244,6 +252,7 @@
       (else (error 'unknown "unknown")))))
 
 ;Definitions to avoid having to repeatedly type "car", "cadr", and "caddr" for Evaluate, and make it clear what is being grabbed in each case.
+;Abstractions
 (define logicsymbol
   (lambda (input)
     (car input)))
@@ -274,37 +283,31 @@
                                     ))
 
 
-                             ; (return (m_value (cadr line) state)))
-
-
-
         ((eq? (operator line) 'if) (ifhandler line state break continue return))
         ((eq? (operator line) 'while) (whilehandler line state return)) 
+
         ((eq? (car line) 'begin) 
-          ;(call/cc (lambda (return)
-           ;(blockhandler line state break continue return)
            (cdr (blockhandler (cdr line) (cons state state) break continue return))
            ) ;block handler  
         ((eq? (car line) 'continue)
             (cond
               ((not (layered state)) (error 'error "Continue must be inside a block"))
               ;if continue is encountered, restart the block it is within.
-              (else (continue state)) ;dummy
+              (else (continue state)) 
             ))
 
         ((eq? (operator line) 'break)
             (cond 
+              ;break must be in a block
               ((not (layered state)) (error 'error "Break must be inside a block"))
               ;if break is encountered, throw away current layer immediately, 
-              ;but we need to skip the remaining lines in the braces of (begin (xx) (break) (xxx))
-              ;how to implement call/cc to do exactly that?
-              (else (break state)) ;dummy
+              (else (break state)) 
             ))
+        ; try catch block all contains braces, so adding and stripping layers of states are present
         ((eq? (operator line) 'try) (cdr (tryhandler line (cons state state) break continue return)))
         ((eq? (operator line) 'catch) (cdr (catchhandler line (cons state state) break continue return)))
         ((eq? (operator line) 'finally) (cdr (perform (cadr line) (cons state state) break continue return)))
         (else state)
-
 
       )))
 
@@ -330,21 +333,15 @@
 
 
 
-
+;block is handled via continuation of break and continue
 (define blockhandler
   (lambda (line s break continue return)
-    ;(cdr (interpreter (cdr line) (cons s s) (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return))
-
-
-
 
             (cond 
               ((empty? (cdr line)) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return)) 
               (else 
                 (blockhandler (cdr line) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return) break continue return)))
     
-
-
     )
   )
         
@@ -356,20 +353,14 @@
       ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
       ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
       (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
+      ;normal try catch block, gets run sequentially
       )
   )
 )
 
-
+; intepreting catch, assign thrown to the variable
 (define catchhandler 
   (lambda (line s break continue return) 
     (interpreter (caddr line) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
     )
   )
-
-
-; (define throwhandler 
-;   (lambda (line s break continue return) 
-;     (m_declare line s)
-;   )
-; )
