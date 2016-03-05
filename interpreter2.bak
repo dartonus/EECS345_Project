@@ -221,9 +221,10 @@
 (define whilehandler
   (lambda (line state return)
     (call/cc (lambda (break)
+        (call/cc (lambda (continue)
           (if (not (evaluate (cadr line) state))
-            (break state)
-            (whilehandler line (call/cc (lambda (continue)(perform (caddr line) state break continue return))) return))))))
+            (continue state)
+            (whilehandler line (perform (caddr line) state break continue return) return))))))))
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
 (define evaluate
@@ -283,12 +284,7 @@
            ;(blockhandler line state break continue return)
            (cdr (blockhandler (cdr line) (cons state state) break continue return))
            ) ;block handler  
-        ((eq? (car line) 'continue)
-            (cond
-              ((not (layered state)) (error 'error "Continue must be inside a block"))
-              ;if continue is encountered, restart the block it is within.
-              (else (continue state)) ;dummy
-            ))
+        ((eq? (car line) 'continue) (continue state)) ;dummy
         ((eq? (car line) 'break)
             (cond 
               ((not (layered state)) (error 'error "Break must be inside a block"))
