@@ -355,7 +355,7 @@
       ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
       ((empty? (itemn line 3)) (perform (item line 4) (perform (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
       ((empty? (itemn line 4)) (perform (item line 3) (perform (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-      (else (perform (itemn line 4) (perform (itemn line 3) (perform (itemn line 2) s break continue return) break continue return) break continue return))
+      (else (perform (item line 4) (perform (itemn line 3) (perform (itemn line 2) s break continue return) break continue return) break continue return))
       )
   )
 )
@@ -363,7 +363,7 @@
 
 (define catchhandler 
   (lambda (line s break continue return) 
-    (perform (car (caddr line)) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
+    (perform (caddr line) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
     )
   )
 
