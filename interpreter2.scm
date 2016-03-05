@@ -20,9 +20,10 @@
         (cond
           ((null? parsed) s)
           ((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue return) (cdr s)) break continue return))
+          ((pair? (car parsed)) (interpreter (cdr parsed) (perform (car parsed) s break continue return) break continue return))
           ;((empty? (cdr parsed)) (perform (car parsed) s break continue return))
          ;(begin (perform (car parsed) s) (interpreter (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpreter (cdr list)
-          (else (interpreter (cdr parsed) (perform (car parsed) s break continue return) break continue return))
+          (else (interpreter (cdr parsed) (perform parsed s break continue return) break continue return))
         )
       )
  )
@@ -225,8 +226,6 @@
             (break state)
             (whilehandler line (call/cc (lambda (continue)(perform (caddr line) state break continue return))) return))))))
 
-
-
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
 (define evaluate
   (lambda (line state)
@@ -292,6 +291,7 @@
               ;if continue is encountered, restart the block it is within.
               (else (continue state)) ;dummy
             ))
+
         ((eq? (operator line) 'break)
             (cond 
               ((not (layered state)) (error 'error "Break must be inside a block"))
@@ -300,9 +300,9 @@
               ;how to implement call/cc to do exactly that?
               (else (break state)) ;dummy
             ))
-        ((eq? (operator line) 'try) (tryhandler line state break continue return))
-        ((eq? (operator line) 'catch) (catchhandler line state break continue return))
-        ((eq? (operator line) 'finally) (perform (cadr line) state break continue return))
+        ((eq? (operator line) 'try) (cdr (tryhandler line (cons state state) break continue return)))
+        ((eq? (operator line) 'catch) (cdr (catchhandler line (cons state state) break continue return)))
+        ((eq? (operator line) 'finally) (cdr (perform (cadr line) (cons state state) break continue return)))
         (else state)
 
 
@@ -353,9 +353,9 @@
   (lambda (line s break continue return) 
     (cond 
       ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
-      ((empty? (itemn line 3)) (perform (item line 4) (perform (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
-      ((empty? (itemn line 4)) (perform (item line 3) (perform (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-      (else (perform (itemn line 4) (perform (itemn line 3) (perform (itemn line 2) s break continue return) break continue return) break continue return))
+      ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
+      ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
+      (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
       )
   )
 )
@@ -363,7 +363,7 @@
 
 (define catchhandler 
   (lambda (line s break continue return) 
-    (perform (car (caddr line)) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
+    (interpreter (caddr line) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
     )
   )
 

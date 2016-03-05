@@ -221,17 +221,13 @@
 (define whilehandler
   (lambda (line state return)
     (call/cc (lambda (break)
-<<<<<<< HEAD
           (if (not (evaluate (cadr line) state))
             (break state)
             (whilehandler line (call/cc (lambda (continue)(perform (caddr line) state break continue return))) return))))))
+<<<<<<< HEAD
 
 
 =======
-        (call/cc (lambda (continue)
-          (if (not (evaluate (cadr line) state))
-            (continue state)
-            (whilehandler line (perform (caddr line) state break continue return) return))))))))
 >>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
@@ -268,18 +264,11 @@
 (define perform
   (lambda (line state break continue return)
       (cond
-<<<<<<< HEAD
         ( (eq? (operator line) 'var) (m_declare line state))
         ((eq? (operator line) 'throw) (m_declare (cons 'var line) state))
         ((eq? (operator line) '=) (m_state line state))
         ;return needs revamp (immediate break)
         ((or (eq? (operator line) 'return) (eq? (operator line) 'throw)) 
-=======
-        ((eq? (car line) 'var) (m_declare line state))
-        ((eq? (car line) '=) (m_state line state))
-        ;return needs revamp (immediate break)
-        ((eq? (car line) 'return)  
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
                             (cond
                                     ((eq? (cadr line) 'state) (return state))
                                     ;above line is for debugging
@@ -293,28 +282,22 @@
 
 
 
-<<<<<<< HEAD
         ((eq? (operator line) 'if) (ifhandler line state break continue return))
         ((eq? (operator line) 'while) (whilehandler line state return)) 
-=======
-        ((eq? (car line) 'if) (ifhandler line state break continue return))
-        ((eq? (car line) 'while) (whilehandler line state return)) 
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
         ((eq? (car line) 'begin) 
           ;(call/cc (lambda (return)
            ;(blockhandler line state break continue return)
            (cdr (blockhandler (cdr line) (cons state state) break continue return))
            ) ;block handler  
-<<<<<<< HEAD
         ((eq? (car line) 'continue)
             (cond
               ((not (layered state)) (error 'error "Continue must be inside a block"))
               ;if continue is encountered, restart the block it is within.
               (else (continue state)) ;dummy
             ))
+<<<<<<< HEAD
         ((eq? (operator line) 'break)
 =======
-        ((eq? (car line) 'continue) (continue state)) ;dummy
         ((eq? (car line) 'break)
 >>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
             (cond 
@@ -324,12 +307,9 @@
               ;how to implement call/cc to do exactly that?
               (else (break state)) ;dummy
             ))
-<<<<<<< HEAD
         ((eq? (operator line) 'try) (tryhandler line state break continue return))
         ((eq? (operator line) 'catch) (catchhandler line state break continue return))
         ((eq? (operator line) 'finally) (perform (cadr line) state break continue return))
-=======
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
         (else state)
 
 
@@ -359,11 +339,7 @@
 
 
 (define blockhandler
-<<<<<<< HEAD
   (lambda (line s break continue return)
-=======
-	(lambda (line s break continue return)
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
     ;(cdr (interpreter (cdr line) (cons s s) (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return))
 
 
@@ -379,7 +355,6 @@
     )
   )
         
-<<<<<<< HEAD
 
 (define tryhandler 
   (lambda (line s break continue return) 
@@ -387,24 +362,15 @@
       ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
       ((empty? (itemn line 3)) (perform (item line 4) (perform (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
       ((empty? (itemn line 4)) (perform (item line 3) (perform (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-      (else (perform (item line 4) (perform (itemn line 3) (perform (itemn line 2) s break continue return) break continue return) break continue return))
+      (else (perform (itemn line 4) (perform (itemn line 3) (perform (itemn line 2) s break continue return) break continue return) break continue return))
       )
-=======
-(define gotohandler (lambda (v) v))
-
-
-(define breakhandler
-  (lambda (line s)
-    (blockhandler line s #t)
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
   )
 )
 
 
-<<<<<<< HEAD
 (define catchhandler 
   (lambda (line s break continue return) 
-    (perform (caddr line) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
+    (perform (car (caddr line)) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
     )
   )
 
@@ -414,20 +380,3 @@
 ;     (m_declare line s)
 ;   )
 ; )
-=======
-(define continuehandler 
-  (lambda (line s)
-    (call/cc
-        (s)
-      )
-  )
-)
-
-
-
-(define trycatchhandler (lambda (v) v))
-
-
-
-(define throwhandler (lambda (v) v))
->>>>>>> 7066a844087f8463c3394e20688da02b18b99a64
