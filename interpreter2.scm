@@ -7,32 +7,38 @@
 ;-------------------------start-----------------------------
 (define interpret
   (lambda (filename)
-    (interpreter (parser filename) newstate)
+    (call/cc (lambda (return)
+    (interpreter (parser filename) newstate newbreak newcontinue return)))
     )
   )
 
 ;Interpretation method, runs through each sublist within the list of lists returned by parser, effectively going through the original text line-by-line.
 
 (define interpreter
-  (lambda (parsed s)
-    (begin
-      ;intializing a state variable 
-      (if (empty? (cdr parsed)) 
-        (perform (car parsed) s)
-       ;(begin (perform (car parsed) s) (interpreter (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpreter (cdr list)
-       (interpreter (cdr parsed) (perform (car parsed) s))
+    (lambda (parsed s break continue return)
+        ;intializing a state variable 
+        (cond
+          ((null? parsed) s)
+          ((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue return) (cdr s)) break continue return))
+          ;((empty? (cdr parsed)) (perform (car parsed) s break continue return))
+         ;(begin (perform (car parsed) s) (interpreter (cdr parsed) (perform (car parsed) s))) ;perform (car list) and go interpreter (cdr list)
+          (else (interpreter (cdr parsed) (perform (car parsed) s break continue return) break continue return))
+        )
       )
-    )
-  )
  )
 ;-------------------------end-----------------------------
 (define newstate '(()()))
+(define newbreak (lambda (v) v))
+(define newcontinue (lambda (v) v))
 
 (define layered
   (lambda (state)
-    (if (empty? (car state))
-      #f
-    (list? (caar state))))
+    (cond 
+      ((void? state) #f)
+      ((empty? state) #f)
+      ((empty? (car state)) #f)
+      (else (list? (caar state))))
+  )
 )
 
 
@@ -213,10 +219,12 @@
 ; (cadr line) - gets the element that is second in the provided line, which should be the clause for the while loop.
 ; (caddr line) gets the third element in the provided line, which should be the procedure for the while loop.
 (define whilehandler
-  (lambda (line state)
-    (if (not (evaluate (cadr line) state))
-       state
-       (whilehandler line (perform (caddr line) state)))))
+  (lambda (line state return)
+    (call/cc (lambda (break)
+        (call/cc (lambda (continue)
+          (if (not (evaluate (cadr line) state))
+            (continue state)
+            (whilehandler line (perform (caddr line) state break continue return) return))))))))
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
 (define evaluate
@@ -250,47 +258,55 @@
 
 ;Performs the task of a given line, by calling the method that pertains to the line's opening.
 (define perform
-  (lambda (line state)
-    (call/cc (lambda (break)
+  (lambda (line state break continue return)
       (cond
         ((eq? (car line) 'var) (m_declare line state))
         ((eq? (car line) '=) (m_state line state))
         ;return needs revamp (immediate break)
-        ((eq? (car line) 'return) (cond
-                                    ((eq? (cadr line) 'state) state)
+        ((eq? (car line) 'return)  
+                            (cond
+                                    ((eq? (cadr line) 'state) (return state))
                                     ;above line is for debugging
-                                    ((eq? (m_value (cadr line) state) #t) (display 'true))
-                                    ((eq? (m_value (cadr line) state) #f) (display 'false))
-                                    (else (display (m_value (cadr line) state)))
+                                    ((eq? (return (m_value (cadr line) state)) #t) (display 'true))
+                                    ((eq? (return (m_value (cadr line) state)) #f) (display 'false))
+                                    (else (display (return (m_value (cadr line) state))))
                                     ))
-        ((eq? (car line) 'if) (ifhandler line state))
-        ((eq? (car line) 'while) (whilehandler line state)) 
+
+
+                             ; (return (m_value (cadr line) state)))
+
+
+
+        ((eq? (car line) 'if) (ifhandler line state break continue return))
+        ((eq? (car line) 'while) (whilehandler line state return)) 
         ((eq? (car line) 'begin) 
           ;(call/cc (lambda (return)
-           (cdr (blockhandler (cdr line) (cons state state) #f))) ;block handler
-        
-
-        ((eq? (car line) 'continue) state) ;dummy
-        ((eq? (car line) 'break) 
+           ;(blockhandler line state break continue return)
+           (cdr (blockhandler (cdr line) (cons state state) break continue return))
+           ) ;block handler  
+        ((eq? (car line) 'continue) (continue state)) ;dummy
+        ((eq? (car line) 'break)
             (cond 
-              ((not (layered state)) (break (error 'error "Break must be inside a block"))) 
+              ((not (layered state)) (error 'error "Break must be inside a block"))
               ;if break is encountered, throw away current layer immediately, 
               ;but we need to skip the remaining lines in the braces of (begin (xx) (break) (xxx))
               ;how to implement call/cc to do exactly that?
-              (else (break (breakhandler line state))) ;dummy
-            )
-        )))
+              (else (break state)) ;dummy
+            ))
+        (else state)
+
+
       )))
 
 
 
 ;Ifhandler - does its clause if the condition is met. If condition is not met, AND an else clause is present, performs the else clause.
 (define ifhandler
-  (lambda (line state)
+  (lambda (line state break continue return)
     (cond
-      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state))
+      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state break continue return))
       ((null? (itemn line 4)) state)
-      (else (perform (itemn line 4) state)))))
+      (else (perform (itemn line 4) state break continue return)))))
 
 
 ;find the nth item in a list
@@ -306,17 +322,21 @@
 
 
 (define blockhandler
-	(lambda (line s break)
-    (call/cc (lambda (breakout)
-        (if break
-            (breakout s)       
-            (if (empty? (cdr line)) 
-              (perform (car line) s)
-              (blockhandler (cdr line) (perform (car line) s) break)))
-      )
+	(lambda (line s break continue return)
+    ;(cdr (interpreter (cdr line) (cons s s) (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return))
+
+
+
+
+            (cond 
+              ((empty? (cdr line)) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return)) 
+              (else 
+                (blockhandler (cdr line) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return) break continue return)))
+    
+
+
     )
   )
-)
         
 (define gotohandler (lambda (v) v))
 
