@@ -11,20 +11,20 @@
 (define interpret
   (lambda (filename)
     (call/cc (lambda (return)
-    (interpreter (parser filename) newstate newbreak newcontinue return)))
+    (interpreter (parser filename) newstate newbreak newcontinue newthrow return)))
     )
   )
 
 ;Interpretation method, runs through each sublist within the list of lists returned by parser, effectively going through the original text line-by-line.
 
 (define interpreter
-    (lambda (parsed s break continue return)
+    (lambda (parsed s break continue throw return)
         ;intializing a state variable 
         (cond
           ((null? parsed) s)
-          ((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue return) (cdr s)) break continue return))
-          ((pair? (car parsed)) (interpreter (cdr parsed) (perform (car parsed) s break continue return) break continue return))
-          (else (interpreter (cdr parsed) (perform parsed s break continue return) break continue return))
+          ((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue throw return) (cdr s)) break continue throw return))
+          ((pair? (car parsed)) (interpreter (cdr parsed) (perform (car parsed) s break continue throw return) break continue throw return))
+          (else (interpreter (cdr parsed) (perform parsed s break continue throw return) break continue throw return))
         )
       )
  )
@@ -34,6 +34,7 @@
 (define newstate '(()()))
 (define newbreak (lambda (v) v))
 (define newcontinue (lambda (v) v))
+(define newthrow (lambda (v) v))
 
 ;helper to determine whether a state is layered (currently in a block)
 (define layered
@@ -222,11 +223,11 @@
 ; (cadr line) - gets the element that is second in the provided line, which should be the clause for the while loop.
 ; (caddr line) gets the third element in the provided line, which should be the procedure for the while loop.
 (define whilehandler
-  (lambda (line state return)
+  (lambda (line state throw return)
     (call/cc (lambda (break)
           (if (not (evaluate (cadr line) state))
             (break state)
-            (whilehandler line (call/cc (lambda (continue)(perform (caddr line) state break continue return))) return))))))
+            (whilehandler line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
 ;while with call/cc of break and continue passed from perform
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
@@ -262,10 +263,10 @@
 
 ;Performs the task of a given line, by calling the method that pertains to the line's opening.
 (define perform
-  (lambda (line state break continue return)
+  (lambda (line state break continue throw return)
       (cond
         ( (eq? (operator line) 'var) (m_declare line state))
-        ((eq? (operator line) 'throw) (m_declare (cons 'var line) state))
+        ((eq? (operator line) 'throw) (throwhandler line state throw))
         ((eq? (operator line) '=) (m_state line state))
         ;return needs revamp (immediate break)
         ((or (eq? (operator line) 'return) (eq? (operator line) 'throw)) 
@@ -278,11 +279,11 @@
                                     ))
 
 
-        ((eq? (operator line) 'if) (ifhandler line state break continue return))
-        ((eq? (operator line) 'while) (whilehandler line state return)) 
+        ((eq? (operator line) 'if) (ifhandler line state break continue throw return))
+        ((eq? (operator line) 'while) (whilehandler line state throw return)) 
 
         ((eq? (car line) 'begin) 
-           (cdr (blockhandler (cdr line) (cons state state) break continue return))
+           (cdr (blockhandler (cdr line) (cons state state) break continue throw return))
            ) ;block handler  
         ((eq? (car line) 'continue)
             (cond
@@ -299,9 +300,9 @@
               (else (break state)) 
             ))
         ; try catch block all contains braces, so adding and stripping layers of states are present
-        ((eq? (operator line) 'try) (cdr (tryhandler line (cons state state) break continue return)))
-        ((eq? (operator line) 'catch) (cdr (catchhandler line (cons state state) break continue return)))
-        ((eq? (operator line) 'finally) (cdr (perform (cadr line) (cons state state) break continue return)))
+        ((eq? (operator line) 'try) (cdr (tcfhandler line (cons state state) break continue throw return)))
+        ; ((eq? (operator line) 'catch) (cdr (catchhandler line (cons state state) break continue return)))
+        ; ((eq? (operator line) 'finally) (cdr (perform (cadr line) (cons state state) break continue return)))
         (else state)
 
       )))
@@ -310,11 +311,11 @@
 
 ;Ifhandler - does its clause if the condition is met. If condition is not met, AND an else clause is present, performs the else clause.
 (define ifhandler
-  (lambda (line state break continue return)
+  (lambda (line state break continue throw return)
     (cond
-      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state break continue return))
+      ((eq? (evaluate (cadr line) state) #t) (perform (caddr line) state break continue throw return))
       ((null? (itemn line 4)) state)
-      (else (perform (itemn line 4) state break continue return)))))
+      (else (perform (itemn line 4) state break continue throw return)))))
 
 
 ;find the nth item in a list
@@ -330,32 +331,88 @@
 
 ;block is handled via continuation of break and continue
 (define blockhandler
-  (lambda (line s break continue return)
+  (lambda (line s break continue throw return)
 
             (cond 
-              ((empty? (cdr line)) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return)) 
+              ((empty? (cdr line)) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return)) 
               (else 
-                (blockhandler (cdr line) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) return) break continue return)))
+                (blockhandler (cdr line) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return) break continue throw return)))
     
     )
   )
         
 
-(define tryhandler 
-  (lambda (line s break continue return) 
-    (cond 
-      ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
-      ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
-      ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-      (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
-      ;normal try catch block, gets run sequentially
-      )
-  )
-)
+; (define tryhandler 
+;   (lambda (line s break continue return) 
+;         (cond 
+;           ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
+;           ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
+;           ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
+;           (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
+;           ;normal try catch block, gets run sequentially
+;           )
+;   )
+; )
 
-; intepreting catch, assign thrown to the variable
-(define catchhandler 
-  (lambda (line s break continue return) 
-    (interpreter (caddr line) (def_with_value (caadr line) (lookup 'throw s) s) break continue return) 
-    )
-  )
+; ; intepreting catch, assign thrown to the variable
+; (define catchhandler 
+;   (lambda (line s break continue throw return) 
+
+;             (interpreter (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return)
+;     )
+;   )
+
+; (define throwhandler 
+;   (lambda (line s throw)
+;     (throw (cadr statement) s)
+;     )
+;   )
+
+
+
+;--------------------------- copied code --------------------
+
+(define breakhandler (lambda (state break) (break state)))
+
+(define continuehandler (lambda (state continue) (continue state)))
+
+(define throwbreakhandler
+  (lambda (line state throw)
+    (throw (cadr line) state)))
+
+
+(define tcfhandler
+  (lambda (statement state break continue throw return)
+    (call/cc
+     (lambda (try-break)
+       (letrec ((finally (lambda (s)
+                    (cond
+                      ((null? (finally-stmt statement)) s)
+                      ((list? (car (finally-body statement))) (interpreter (finally-body statement) s break continue throw return))
+                      (else (perform (finally-body statement) s break continue throw return)))))
+
+                (try (lambda (s try-throw)
+                       (if (list? (car (try-body statement)))
+                           (finally (interpreter (try-body statement) s break continue try-throw return))
+                           (finally (perform (try-body statement) s break continue try-throw return)))))
+
+                (catch (lambda (e s)
+                         (if (list? (car (catch-body statement)))
+                             (finally (interpreter (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return))
+                             (finally (perform (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return))))))
+         (try state (lambda (e s) (try-break (catch e s)))) )))))
+
+(define replace*-cps
+  (lambda (old new l return)
+    (cond
+      ((null? l) (return l))
+      ((pair? (car l)) (replace*-cps old new (cdr l) (lambda (v) (replace*-cps old new (car l) (lambda (v2) (return (cons v2 v)))))))
+      ((eq? (car l) old) (replace*-cps old new (cdr l) (lambda (v) (return (cons new v)))))
+      (else (replace*-cps old new (cdr l) (lambda (v) (return (cons (car l) v))))))))
+
+  ; (try body (catch (e) body) (finally body))
+(define try-body cadr)
+(define catch-body (lambda (t) (if (null? (cddr (caddr t)))  '()  (car (cddr (caddr t))))))
+(define catch-err (lambda (t) (car (cadr (caddr t)))))
+(define finally-stmt (lambda (t) (car (cdddr t))))
+(define finally-body (lambda (t) (cadr (car (cdddr t)))))
