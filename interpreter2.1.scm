@@ -300,7 +300,7 @@
               (else (break state)) 
             ))
         ; try catch block all contains braces, so adding and stripping layers of states are present
-        ((eq? (operator line) 'try) (cdr (tcfhandler line (cons state state) break continue throw return)))
+        ((eq? (operator line) 'try) (tcfhandler line state break continue throw return))
         ; ((eq? (operator line) 'catch) (cdr (catchhandler line (cons state state) break continue return)))
         ; ((eq? (operator line) 'finally) (cdr (perform (cadr line) (cons state state) break continue return)))
         (else state)
