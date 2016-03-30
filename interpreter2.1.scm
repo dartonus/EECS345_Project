@@ -152,7 +152,13 @@
 (define m_declare
   (lambda (expression s)
     (if (layered s)
-      (cons (m_declare expression (car s)) (cdr s))
+      (cons (if (eq? (car expression) 'var)
+          (if (not (null? (cddr expression)))
+            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+            (def_null (cadr expression) s);else parse "var x"
+          )
+          "not valid declare"
+        ) (cdr s))
         (if (eq? (car expression) 'var)
           (if (not (null? (cddr expression)))
             (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
@@ -189,10 +195,10 @@
         ((eq? 'null expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
         ((eq? 'false expression) #f)
-        ((symbol? expression) (lookup expression s))
+        ((symbol? expression) (if (eq? (lookup expression s) "undefined") (error 'error "undefined") (lookup expression s)))
         ((number? expression) expression)
         ((boolean? expression) expression)
-        ((eq? '= (operator expression)) (m_value (m_value (operand2 expression) s) (m_state expression s)))
+        ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
         ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '- (operator expression)) (if (null? (cddr expression))
                                             (- 0 (m_value (operand1 expression) s))
@@ -228,6 +234,28 @@
           (if (not (evaluate (cadr line) state))
             (break state)
             (whilehandler line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
+
+
+; (define whilehandler
+;   (lambda (statement state break continue throw return)
+;     (call/cc
+;      (lambda (brk)
+;        (letrec ((loop (lambda (statement state)
+;                         (if (evaluate (while-cond statement) (perform (while-cond statement) state newbreak newbreak newthrow newbreak))
+;                             (loop statement (perform (while-stmt statement)
+;                                                      (perform (while-cond statement) state newbreak newbreak newthrow newbreak)
+;                                                      (lambda (s) (brk s))
+;                                                      (lambda (s) (brk (loop statement s)))
+;                                                      throw return))
+;                             (perform (while-cond statement) (perform (while-cond statement) state newbreak newbreak newthrow newbreak) newbreak newbreak newthrow newbreak)))))
+;          (loop statement state))))))                            
+; (define while-cond cadr)
+; (define while-stmt caddr)
+
+
+
+
+
 ;while with call/cc of break and continue passed from perform
 
 ; Evaluate is a shortened version of the earlier expression evaluator, intended for use with logical clauses such as those used by If and While.
