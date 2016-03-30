@@ -267,7 +267,7 @@
         ((boolean? expression) expression)
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
-        ((eq? 'funcall  (operator expression)) (m_call_func expression (cons s s)))
+        ((eq? 'funcall  (operator expression)) (m_call_func expression s))
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
         ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
