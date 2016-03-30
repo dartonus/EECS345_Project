@@ -124,7 +124,7 @@
       )
 
         (if (eq? "undefined" (lookup name (car s)))
-          (lookup name (getrootlayer s))
+          (lookup name (cdr s))
           (lookup name (car s))))
   )
 )
