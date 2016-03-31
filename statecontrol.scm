@@ -100,14 +100,14 @@
       state
       )))
 
-; ; Returns the reference to the given variable.
-; (define lookupbox (lambda (name state)
-;     (letrec ((search (lambda (name state)
-;         (if (inscope? name (currentlayer state))
-;           (getval name (currentlayer state))
-;           (search name (restlayers state))))))
-;       (search name (unbox state)))))
+; Returns the reference to the given variable.
+(define lookupbox (lambda (name state)
+    (letrec ((search (lambda (name state)
+        (if (inscope? name (currentlayer state))
+          (getval name (currentlayer state))
+          (search name (restlayers state))))))
+      (search name (unbox state)))))
 
-; ; Returns the value of the given variable.
-; (define lookup (lambda (name state) (unbox (lookupbox name state))))
+; Returns the value of the given variable.
+(define lookup (lambda (name state) (unbox (lookupbox name state))))
 

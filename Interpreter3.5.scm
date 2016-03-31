@@ -65,15 +65,15 @@
 )
 
 ;Finds the value of a variable of a given name within our state.
-(define lookupbox (lambda (name state)
-    (letrec ((search (lambda (name state)
-        (if (inscope? name (currentlayer state))
-          (getval name (currentlayer state))
-          (search name (restlayers state))))))
-      (search name (unbox state)))))
+; (define lookupbox (lambda (name state)
+;     (letrec ((search (lambda (name state)
+;         (if (inscope? name (currentlayer state))
+;           (getval name (currentlayer state))
+;           (search name (restlayers state))))))
+;       (search name (unbox state)))))
 
-;Finds the value of a variable of a given name within our state unboxed.
-(define lookup (lambda (name state) (unbox (lookupbox name state))))
+; ;Finds the value of a variable of a given name within our state unboxed.
+; (define lookup (lambda (name state) (unbox (lookupbox name state))))
 
 ;assign in execution space
 (define assignhandler (lambda (line state)
@@ -164,33 +164,33 @@
 ;prefix parser
 (define operator
   (lambda (input)
-    (car input)))
+    (if (null? input)  '() (car  input))))
 
 (define logicsymbol
   (lambda (input)
-    (car input)))
+    (operator input)))
 
 (define operand1
   (lambda (input)
-    (cadr input)))
+    (if (null? (cdr input)) '() (cadr input))))
 
 (define operand2
   (lambda (input)
-    (caddr input)))
+    (if (null? (cddr  input)) '() (caddr  input))))
 
 ;Performs the task of a given line, by calling the method that pertains to the line's opening.
 (define perform
   (lambda (line state break continue throw return)
       (cond
         
-        ((eq? (cadr line) 'state) (return state))
+        ;((eq? (cadr line) 'state) (return state))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
         ((eq? (operator line) '=) (assignhandler line state))
         ;return needs revamp (immediate break)
         ((eq? (operator line) 'return)
                             (cond
                                     ((eq? (cadr line) 'state) (return state))
-                                    (else (return (m_value (cadr line) state)))
+                                    (else (return (m_value (operand1 line) state)))
                                     ))
 
 
@@ -441,13 +441,15 @@
           ))
       (else (m_state
         (car formals)
-        (m_declare (car params) state)
+        (m_value (car params) state)
+        (m_declare
+         (car formals)
           (set_formal_params
             (cdr params)
             (cdr formals)
             state
             funcscope)
-          ))
+          )))
       )))
 
 
