@@ -1,4 +1,5 @@
 function min(x, y, z) {
+
   if (x < y) {
     if (x < z)
       return x;

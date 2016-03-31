@@ -11,7 +11,7 @@
 ;usage: ex: (interpret "test1.txt")
 
 (define interpret (lambda (file)
-      (boolean_filter (m_call_func '(funcall main) (interpreter_global (parser file) (newstate)) newthrow))
+      (boolean_filter (m_call_func '(funcall main) (interpreter_global (parser file) (newstate))))
       ))
 
 ;filtering boolean results to display nicely
@@ -34,8 +34,6 @@
         ;intializing a state variable 
         (cond
           ((null? parsed) s) ;if parsed to the end, evaluate main
-          ;((layered s) (interpreter (cdr parsed) (cons (perform (car parsed) (car s) break continue throw return) (cdr s)) break continue throw return))
-          ;((pair? (car parsed)) (interpreter (cdr parsed) (perform (car parsed) s break continue throw return) break continue throw return))
           (else (interpreter (cdr parsed) (perform (car parsed) s break continue throw return) break continue throw return))
         )
       )
@@ -63,17 +61,6 @@
       (else (list? (caar state))))
   )
 )
-
-;Finds the value of a variable of a given name within our state.
-; (define lookupbox (lambda (name state)
-;     (letrec ((search (lambda (name state)
-;         (if (inscope? name (currentlayer state))
-;           (getval name (currentlayer state))
-;           (search name (restlayers state))))))
-;       (search name (unbox state)))))
-
-; ;Finds the value of a variable of a given name within our state unboxed.
-; (define lookup (lambda (name state) (unbox (lookupbox name state))))
 
 ;assign in execution space
 (define assignhandler (lambda (line state)
@@ -103,7 +90,7 @@
         ((null? (cdr expression)) (m_value (car expression) s))
         ((eq? (operator expression) 'var) (declarehandler expression s))
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
-        ((eq? 'funcall  (operator expression)) (m_call_func expression s newthrow))
+        ((eq? 'funcall  (operator expression)) (m_call_func expression s))
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (assignhandler expression s))))
         ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '- (operator expression)) (if (null? (cddr expression))
@@ -141,23 +128,6 @@
             (whilehandler line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
 
 
-; (define whilehandler
-;   (lambda (statement state break continue throw return)
-;     (call/cc
-;      (lambda (brk)
-;        (letrec ((loop (lambda (statement state)
-;                         (if (evaluate (while-cond statement) (perform (while-cond statement) state newbreak newbreak newthrow newbreak))
-;                             (loop statement (perform (while-stmt statement)
-;                                                      (perform (while-cond statement) state newbreak newbreak newthrow newbreak)
-;                                                      (lambda (s) (brk s))
-;                                                      (lambda (s) (brk (loop statement s)))
-;                                                      throw return))
-;                             (perform (while-cond statement) (perform (while-cond statement) state newbreak newbreak newthrow newbreak) newbreak newbreak newthrow newbreak)))))
-;          (loop statement state))))))                            
-; (define while-cond cadr)
-; (define while-stmt caddr)
-
-
 
 ;Abstractions
 
@@ -192,7 +162,6 @@
                                     ((eq? (cadr line) 'state) (return state))
                                     (else (return (m_value (operand1 line) state)))
                                     ))
-
 
         ((eq? (operator line) 'if) (ifhandler line state break continue throw return))
         ((eq? (operator line) 'while) (whilehandler line state throw return)) 
@@ -234,18 +203,6 @@
 
 
 
-;block is handled via continuation of break and continue
-; (define blockhandler
-;   (lambda (line s break continue throw return)
-
-;             (cond 
-;               ((empty? (cdr line)) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return)) 
-;               (else 
-;                 (blockhandler (cdr line) (perform (car line) s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return) break continue throw return)))
-    
-;     )
-;   )
-
 (define blockhandler
   (lambda (line s break continue throw return)
     (poplayer
@@ -255,42 +212,15 @@
         (lambda (v)
           (break (poplayer v)))
         (lambda (v)
-          (contitnue (poplayer v)))
+          (continue (poplayer v)))
         (lambda (v)
           (throw (poplayer v)))
         return
         ))    
 
-    
     )
   )
 
-
-; (define tryhandler 
-;   (lambda (line s break continue return) 
-;         (cond 
-;           ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
-;           ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
-;           ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-;           (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
-;           ;normal try catch block, gets run sequentially
-;           )
-;   )
-; )
-
-; ; intepreting catch, assign thrown to the variable
-; (define catchhandler 
-;   (lambda (line s break continue throw return) 
-
-;             (interpreter (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return)
-;     )
-;   )
-
-; (define throwhandler 
-;   (lambda (line s throw)
-;     (throw (cadr statement) s)
-;     )
-;   )
 
 
 
@@ -344,15 +274,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 ;------------------------------------- Functions
 ;functions would be stored as ((name) ())
 
@@ -368,16 +289,6 @@
     )
   )
 
-;initializing the formal parameters to null in the function scope
-; (define intialize_formal_params 
-;   (lambda (lis state)
-;     (cond 
-;       ((empty? lis) state)
-;       (else (intialize_formal_params (cdr lis) (def_null (car lis) state)))
-;       ) 
-;     )
-;   )
-
 
 ;function construting the function closure that would be stored
 (define makeclosure 
@@ -389,7 +300,7 @@
 
 ;function call line would be parsed as '(funcall fib (- a 1))
 (define m_call_func
-  (lambda (line state throw)
+  (lambda (line state)
     (call/cc (lambda (return)
       (perform_func 
         (cadr (lookup (operand1 line) state))
@@ -398,7 +309,6 @@
           (car (lookup (operand1 line) state))
           state
           ((caddr (lookup (operand1 line) state))))
-        throw
         return)
       )
     )
@@ -409,17 +319,14 @@
 
 ;running the body of func, it would create a new frame of state and pop off when finishing
 (define perform_func 
-  (lambda (body state throw return)
+  (lambda (body state return)
     (poplayer
       (interpreter
         body
         (pushlayer state)
-        ;state
-        ;(cons '(()()) state)
         (lambda (v) (error "break error"))
         (lambda (v) (error "continue error"))
-        (lambda (v)
-          (throw (poplayer v)))
+        (lambda (v) (error "throw error")) ;implement function throw later
         return
       )
     )

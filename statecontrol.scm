@@ -109,5 +109,9 @@
       (search name (unbox state)))))
 
 ; Returns the value of the given variable.
-(define lookup (lambda (name state) (unbox (lookupbox name state))))
+(define lookup (lambda (name state) 
+  (cond
+    ((box? (lookupbox name state)) (unbox (lookupbox name state)))
+    (else (lookupbox name state)))
+))
 
