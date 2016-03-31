@@ -120,11 +120,12 @@
           ;((void? s) "undefined")
           ((empty? (car s)) "undefined")
           ((eq? name (caar s)) (unbox (caadr s)))
+          ;(else (lookup name (remain s)))
           (else (lookup name (remain s)))
       )
 
         (if (eq? "undefined" (lookup name (car s)))
-          (lookup name (cdr s))
+          (lookup name (getrootlayer s))
           (lookup name (car s))))
   )
 )
@@ -163,6 +164,12 @@
         )
       )
   )
+
+
+(define set_func_scope
+  (lambda (funcname scope s)
+    (begin (set-box! (car (lookup funcname s)) scope) s)))
+
 
 ;manually update a state
 (define m_manual_state
@@ -267,7 +274,7 @@
         ((boolean? expression) expression)
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
-        ((eq? 'funcall  (operator expression)) (m_call_func expression (cons s s)))
+        ((eq? 'funcall  (operator expression)) (m_call_func expression s))
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
         ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
@@ -394,7 +401,8 @@
   ;state here is current scope
   (lambda (line state break continue throw return)
       (cond
-        ((eq? (cadr line) 'state) (return state))
+        ((eq? (cadr line) 'state)
+         (return state))
         
         ((eq? (operator line) 'var) (m_declare_inscope line state))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
@@ -646,8 +654,8 @@
 (define makeclosure 
   (lambda (environment paramlist body)
     (if (or (empty? paramlist) (empty? environment))
-      (append environment paramlist (list body))
-      (append (list environment) (list paramlist) (list body))
+      (cons (box environment) (append (list paramlist) (list body)))
+      (cons (box environment) (append (list paramlist) (list body)))
     )
   )
 )
@@ -660,11 +668,13 @@
       (lambda (return)
         (perform_func
           (caddr (lookup (itemn line 2) state))
-          (set_formal_params ;we evaluate the formal parameters
+          ;(set_func_scope (itemn line 2)
+          (append (list (set_formal_params ;we evaluate the formal parameters
             (cddr line)
             (cadr (lookup (itemn line 2) state))
             state
-            (car (lookup (itemn line 2) state)))
+            (unbox (car (lookup (itemn line 2) state))))) (getrootlayer state))
+          ;state)
             return
         )      
       )
@@ -674,7 +684,22 @@
 
 (define callmain
   (lambda (state)
-      (m_call_func '(funcall main) state)
+    (call/cc 
+      (lambda (return)
+        (perform_func
+          (caddr (lookup 'main state))
+          ;(set_func_scope (itemn line 2)
+          ;(cons '(()())
+            (set_formal_params ;we evaluate the formal parameters
+            '()
+            (cadr (lookup 'main state))
+            state
+            (unbox (car (lookup 'main state))))
+            ;)
+          ;state)
+            return)
+        )      
+      )
     )
   )
 
@@ -685,8 +710,9 @@
     (cdr 
       (func_blockhandler
         body
-        ;(cons '(()()) state)
         (cons '(()()) state)
+        ;state
+        ;(cons '(()()) state)
         (lambda (v) (error "break error"))
         (lambda (v) (error "continue error"))
         (lambda (v) (error "throw error")) ;implement function throw later
