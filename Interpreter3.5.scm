@@ -101,7 +101,7 @@
         ;((symbol? expression) (if (eq? (lookup expression s) "undefined") (error 'error "undefined") (lookup expression s)))
         ((not (list? expression)) (lookup expression s))
         ((null? (cdr expression)) (m_value (car expression) s))
-
+        ((eq? (operator expression) 'var) (declarehandler expression s))
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
         ((eq? 'funcall  (operator expression)) (m_call_func expression s))
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (assignhandler expression s))))
@@ -138,7 +138,7 @@
     (call/cc (lambda (break)
           (if (not (m_value (cadr line) state))
             (break state)
-            (whilehandler line name (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
+            (whilehandler line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
 
 
 ; (define whilehandler
@@ -184,7 +184,6 @@
       (cond
         
         ((eq? (cadr line) 'state) (return state))
-        ((eq? (operator line) 'var) (declarehandler line state))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
         ((eq? (operator line) '=) (assignhandler line state))
         ;return needs revamp (immediate break)

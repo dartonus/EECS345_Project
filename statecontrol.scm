@@ -13,7 +13,7 @@
 
 ;abstractions
 (define (names l)  (car l))                 (define (values l)  (cadr l))
-(define (currentlayer state) (car state))   (define (restlayers state) (car state))
+(define (currentlayer state) (car state))   (define (restlayers state) (cdr state))
 
 (define pushlayer (lambda (env)     (begin (set-box! env (cons (newlayer) (unbox env))) env)))
 (define poplayer  (lambda (env)     (begin (set-box! env (cdr (unbox env))) env)))
@@ -63,7 +63,7 @@
 
 (define getval 
   (lambda (name layer) 
-    
+
     (itemn0 (getindex name (names layer)) (values layer))))
 
 (define inscope?  
