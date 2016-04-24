@@ -1,7 +1,7 @@
 #lang racket/load
-;(load "simpleParser.scm")
-(load "functionParser.scm")
 (load "lex.scm")
+(load "classParser.scm")
+
 
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
 
@@ -12,7 +12,7 @@
 (define interpret
   (lambda (filename)
     (call/cc (lambda (return)
-    (callmain (interpreter (parser filename) newstate newbreak newcontinue newthrow return))))
+    (process_classes (interpreter (parser filename) newstate newbreak newcontinue newthrow return))))
     )
   )
 
@@ -182,46 +182,21 @@
 )
 
 ;return the state where the func is defined in
-(define func_state
-  (lambda (func_name allstate)
-    (if (inscope? func_name allstate)
-      (car state)
-      (func_state func_name (cdr state))
-    )
-  )
-)
 
-(define isfunc
-  (lambda (name s)
-    (> (howmany (lookup name s)) 1)
-  )
-)
-
-;(define add_var_in_scope
-;  (lambda (func_name mystate allstate) ;my state is the layer of state where the func is defined in
-;    (cond
-;      ((not (layered mystate)) allstate) ;if my state is global state, just bypass
-;      (1)
+;(define func_state
+;  (lambda (func_name allstate)
+;    (if (inscope? func_name allstate)
+;      (car state)
+;      (func_state func_name (cdr state))
 ;    )
 ;  )
 ;)
 
-;return a list of local state that the name is in most recently
-;(define lookupvarinscope
+;(define isfunc
 ;  (lambda (name s)
-;    (if (inscope? name s)
-;        (car s)
-;      (lookupvarinscope name (cdr s))
-;    )
+;    (> (howmany (lookup name s)) 1)
 ;  )
 ;)
-
-;;given a local state, remove the functions
-;(define rmv_func
-;  1
-;)
-
-;; assume non layered state
 
 
 
@@ -254,7 +229,6 @@
     )
       )
   )
-
 
 (define set_func_scope
   (lambda (funcname scope s)
@@ -364,7 +338,10 @@
         ((boolean? expression) expression)
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
+        ((eq? 'static-function (operator expression)) (m_declare_func expression s))
         ((eq? 'funcall  (operator expression)) (m_call_func expression s))
+        ((eq? 'class  (operator expression)) (m_declare_class expression s))
+
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
         ((eq? '+ (operator expression)) (+ (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
@@ -383,11 +360,11 @@
         ((eq? '&& (operator expression)) (and (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '|| (operator expression)) (or (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '! (logicsymbol expression)) (not (m_value (operand1 expression) s)))
-        (else (error 'unknown "unknown"))) 
+        (else (error s "unknown"))) 
     ;)
       ))
 
-
+;name tracking version
 (define m_value_scope
   (lambda (expression s name)
     ;(if (layered s) (m_value_scope expression (car s))
@@ -419,7 +396,7 @@
         ((eq? '&& (operator expression)) (and (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
         ((eq? '|| (operator expression)) (or (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
         ((eq? '! (logicsymbol expression)) (not (m_value_scope (operand1 expression) s name)))
-        (else (error 'unknown "unknown"))) 
+        (else (error s "unknown"))) 
     ;)
       ))
 
@@ -617,35 +594,8 @@
   )
         
 
-; (define tryhandler 
-;   (lambda (line s break continue return) 
-;         (cond 
-;           ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
-;           ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
-;           ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-;           (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
-;           ;normal try catch block, gets run sequentially
-;           )
-;   )
-; )
 
-; ; intepreting catch, assign thrown to the variable
-; (define catchhandler 
-;   (lambda (line s break continue throw return) 
-
-;             (interpreter (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return)
-;     )
-;   )
-
-; (define throwhandler 
-;   (lambda (line s throw)
-;     (throw (cadr statement) s)
-;     )
-;   )
-
-
-
-;--------------------------- copied code --------------------
+;--------------------------- sample solution --------------------
 
 (define breakhandler (lambda (state break) (break state)))
 
@@ -755,8 +705,12 @@
   (lambda (line state)
     (def_in_scope
       state 
-      (itemn line 2) ;the name of the function
-      (makeclosure (intialize_formal_params (itemn line 3) '(()())) (itemn line 3) (itemn line 4)) ;the function is stored as a closure with its scope, formal param list and its body
+      (itemn line 2) ;the name of the function/class
+      (cond
+        ((empty? (itemn line 3)) (makeclosure (intialize_formal_params (itemn line 3) '(()())) (itemn line 3) (itemn line 4)))
+        ((eq? (car (itemn line 3)) 'extends) (makeclosure '(()()) (cadr (itemn line 3)) (itemn line 4)))
+        (else (makeclosure (intialize_formal_params (itemn line 3) '(()())) (itemn line 3) (itemn line 4)))
+        ) ;the function is stored as a closure with its scope, formal param list and its body
       )
     )
   )
@@ -805,6 +759,7 @@
   )
 )
 
+; we still need a callmain, it locates the static-func main and runs it
 (define callmain
   (lambda (state)
     (call/cc 
@@ -888,3 +843,57 @@
       (not (eq? (lookup name (getfirstlayer entirestates)) "undefined"))
     )
   )
+
+
+
+;-----------------------------------------------------------------------------------------------------------
+;----------------------------------------------class-------------------------------------------------------
+;-----------------------------------------------------------------------------------------------------------
+
+; (class class_name extends body)
+
+(define m_declare_class
+  (lambda (line state)
+    (m_declare_func line state)
+  )
+)
+
+
+; classes parsed after toplevel runthrough:
+; test1: '((A) (#&(#&(() ()) () ((var x 5) (var y 10) (static-function main () ((var a (new A)) (return (+ (dot a x) (dot a y)))))))))
+; then we run the body of the classes to a state ((x y main) (5 10 mainfuncbody))
+; '((A) (#&(#&(() ()) () ((x y main) (5 10 (.....))))))
+; then run the main similar in Part 3
+; after a=new A(); it should gives something like '((A a) (#&(#&(() ()) () ((x y main) (5 10 (.....))))  #&(("truetype is A") ((x y )) (5 10))) ))
+
+
+; top level of the state: Raw classes and New objects, no variables; vars must be in a class now.
+
+(define process_classes
+  (lambda (state)
+    1
+  )
+)
+
+(define m_run_class
+  (lambda (classname state)
+    ;(lookup)
+    1
+  )
+)
+
+;no constructor yet (new A())
+(define create_object
+  (lambda (classname state)
+    1
+  )
+)
+
+
+; dot
+
+(define dothandler
+  (lambda (line state)
+    1
+  )
+)

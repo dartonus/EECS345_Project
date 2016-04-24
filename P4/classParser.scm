@@ -1,4 +1,4 @@
-#lang racket/load
+
 ; A simple parser for a Java style language
 ; EECS 345: Programming Languages Concepts
 ;

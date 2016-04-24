@@ -1,6 +1,6 @@
 #lang racket/load
 ;(load "simpleParser.scm")
-(load "functionParser.scm")
+(load "classParser.scm")
 (load "lex.scm")
 
 ;Team: Callum Grant (chg33), Jiawei Wu (jxw585), John Donnelly (jed126)
@@ -182,46 +182,21 @@
 )
 
 ;return the state where the func is defined in
-(define func_state
-  (lambda (func_name allstate)
-    (if (inscope? func_name allstate)
-      (car state)
-      (func_state func_name (cdr state))
-    )
-  )
-)
 
-(define isfunc
-  (lambda (name s)
-    (> (howmany (lookup name s)) 1)
-  )
-)
-
-;(define add_var_in_scope
-;  (lambda (func_name mystate allstate) ;my state is the layer of state where the func is defined in
-;    (cond
-;      ((not (layered mystate)) allstate) ;if my state is global state, just bypass
-;      (1)
+;(define func_state
+;  (lambda (func_name allstate)
+;    (if (inscope? func_name allstate)
+;      (car state)
+;      (func_state func_name (cdr state))
 ;    )
 ;  )
 ;)
 
-;return a list of local state that the name is in most recently
-;(define lookupvarinscope
+;(define isfunc
 ;  (lambda (name s)
-;    (if (inscope? name s)
-;        (car s)
-;      (lookupvarinscope name (cdr s))
-;    )
+;    (> (howmany (lookup name s)) 1)
 ;  )
 ;)
-
-;;given a local state, remove the functions
-;(define rmv_func
-;  1
-;)
-
-;; assume non layered state
 
 
 
@@ -254,7 +229,6 @@
     )
       )
   )
-
 
 (define set_func_scope
   (lambda (funcname scope s)
@@ -387,7 +361,7 @@
     ;)
       ))
 
-
+;name tracking version
 (define m_value_scope
   (lambda (expression s name)
     ;(if (layered s) (m_value_scope expression (car s))
@@ -617,35 +591,8 @@
   )
         
 
-; (define tryhandler 
-;   (lambda (line s break continue return) 
-;         (cond 
-;           ((empty? (itemn line 2)) (error 'error "Not a valid try block")) ;try body empty : ???
-;           ((empty? (itemn line 3)) (interpreter (itemn line 4) (interpreter (itemn line 2) s break continue return) break continue return)) ;no catch, perform try body then finally
-;           ((empty? (itemn line 4)) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return)) ;no finally, perform try body then catch
-;           (else (interpreter (itemn line 4) (interpreter (itemn line 3) (interpreter (itemn line 2) s break continue return) break continue return) break continue return))
-;           ;normal try catch block, gets run sequentially
-;           )
-;   )
-; )
 
-; ; intepreting catch, assign thrown to the variable
-; (define catchhandler 
-;   (lambda (line s break continue throw return) 
-
-;             (interpreter (replace*-cps (catch-err statement) e (catch-body statement) (lambda (v) v)) s break continue throw return)
-;     )
-;   )
-
-; (define throwhandler 
-;   (lambda (line s throw)
-;     (throw (cadr statement) s)
-;     )
-;   )
-
-
-
-;--------------------------- copied code --------------------
+;--------------------------- sample solution --------------------
 
 (define breakhandler (lambda (state break) (break state)))
 
@@ -888,3 +835,7 @@
       (not (eq? (lookup name (getfirstlayer entirestates)) "undefined"))
     )
   )
+
+
+
+;-----------------------------------------------------------------------------------------------------------
