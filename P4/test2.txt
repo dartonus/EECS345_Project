@@ -6,6 +6,8 @@ class A {
 
   static function main() {
     var a = new A();
+   
+   
     return a.add(10, 2);
   }
 }

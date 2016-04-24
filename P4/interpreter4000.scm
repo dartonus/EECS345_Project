@@ -345,7 +345,7 @@
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
-        ((eq? 'funcall  (operator expression)) (m_call_func expression s))
+        ((eq? 'funcall  (operator expression)) (m_call_func 'main expression s))
         ((eq? 'class  (operator expression)) (m_declare_class expression s))
         ((eq? 'dot (operator expression)) (dothandler expression s))
         ((eq? 'new (operator expression)) (create_object expression s))
@@ -368,7 +368,8 @@
         ((eq? '&& (operator expression)) (and (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '|| (operator expression)) (or (m_value (operand1 expression) s) (m_value (operand2 expression) s)))
         ((eq? '! (logicsymbol expression)) (not (m_value (operand1 expression) s)))
-        (else (error s "unknown"))) 
+        (else expression)) 
+        ;(else (error expression "unknown"))) 
     ;)
       ))
 
@@ -385,7 +386,7 @@
         ((boolean? expression) expression)
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
-        ((eq? 'funcall  (operator expression)) (m_call_func expression s))
+        ((eq? 'funcall  (operator expression)) (m_call_func name expression s))
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
         ((eq? 'dot (operator expression)) (dothandler expression s))
         ((eq? 'new (operator expression)) (create_object expression s))
@@ -407,7 +408,8 @@
         ((eq? '&& (operator expression)) (and (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
         ((eq? '|| (operator expression)) (or (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
         ((eq? '! (logicsymbol expression)) (not (m_value_scope (operand1 expression) s name)))
-        (else (error s "unknown"))) 
+        (else expression)) 
+        ;(else (error expression "unknown"))) 
     ;)
       ))
 
@@ -750,19 +752,42 @@
 
 
 ;function call line would be parsed as '(funcall fib (- a 1))
+;(define m_call_func
+;  (lambda (line state)
+;    (call/cc 
+;      (lambda (return)
+;        (perform_func
+;          (itemn line 2)
+;          (caddr (lookup (itemn line 2) state))
+;          ;(set_func_scope (itemn line 2)
+;           (set_formal_params ;we evaluate the formal parameters
+;            (cddr line)
+;            (cadr (lookup (itemn line 2) state))
+;            state
+;            (unbox (car (lookup (itemn line 2) state))))
+;          ;state)
+;            return
+;        )      
+;      )
+;    )
+;  )
+;)
+
+;now line item 2 would not be the name of the func, but body of the func
+;not implemented correctly
 (define m_call_func
-  (lambda (line state)
+  (lambda (name line state)
     (call/cc 
       (lambda (return)
         (perform_func
-          (itemn line 2)
-          (caddr (lookup (itemn line 2) state))
+          name
+          (caddr (dothandler (itemn line 2) state))
           ;(set_func_scope (itemn line 2)
            (set_formal_params ;we evaluate the formal parameters
             (cddr line)
-            (cadr (lookup (itemn line 2) state))
+            (cadr (dothandler (itemn line 2) state))
             state
-            (unbox (car (lookup (itemn line 2) state))))
+            (unbox (car (dothandler (itemn line 2) state))))
           ;state)
             return
         )      
@@ -770,6 +795,8 @@
     )
   )
 )
+
+
 
 ; we still need a callmain, it locates the static-func main and runs it
 (define callmain
@@ -905,7 +932,21 @@
 (define m_run_main
   (lambda (state)
     (call/cc (lambda (return)
-    (begin (set-box! (itemn (lookup (last (car state)) state) 3) (callmain (unbox (itemn (lookup (last (car state)) state) 3)))) state)))
+      (perform_func
+          'main
+          (caddr (lookup 'main (unbox (itemn (lookup (last (car state)) state) 3)))) ;body of main
+          ;(set_func_scope (itemn line 2)
+          ;(cons '(()())
+            (set_formal_params ;we evaluate the formal parameters
+            '()
+            (cadr (lookup 'main (unbox (itemn (lookup (last (car state)) state) 3))))
+            state
+            (unbox (car (lookup 'main (unbox (itemn (lookup (last (car state)) state) 3))))))
+            ;)
+          ;state)
+            return)
+    ))
+    ;(begin (set-box! (itemn (lookup (last (car state)) state) 3) (callmain (unbox (itemn (lookup (last (car state)) state) 3)))) state)))
   )
 )
 
@@ -917,18 +958,42 @@
   )
 )
 
-;no constructor yet (new A())
+;no constructor yet (new A)
 (define create_object
   (lambda (line state)
-    1
+    (makeclosure_object (cadr line) (caddr (lookup (cadr line) state)))
+  )
+)
+
+(define makeclosure_object
+  (lambda (truetype instancefields)
+    (cons (list truetype) (list instancefields))
+  )
+)
+
+(define getinstancefieldlist
+  (lambda (objname state) 
+    (unbox (cadr (lookup objname state)))
   )
 )
 
 
-; dot
+; (dot a x)
+; works on fields
+; operand2 line : field/method   add/x
+; operand1 line : objname     a
 
 (define dothandler
   (lambda (line state)
-    1
+    (cond 
+      ((eq? 'this (operand1 line)) (lookup (operand2 line) (unbox (cadr (lookup (operand1 line) state))))) ;bypass to class field ;not implemented correctly yet
+      ((isfunc (operand2 line) (getinstancefieldlist (operand1 line) state)) (lookup (operand2 line) (getinstancefieldlist (operand1 line) state)))
+      (else (lookup (operand2 line) (unbox (cadr (lookup (operand1 line) state)))))
+    )
   )
 )
+
+;super
+
+
+;this
