@@ -12,14 +12,14 @@
 (define interpret
   (lambda (filename)
     (call/cc (lambda (return)
-    (process_classes (interpreter (parser filename) newstate newbreak newcontinue newthrow return))))
-    )
+    (m_run_main (process_classes (interpreter (parser filename) newstate newbreak newcontinue newthrow return))))
+    ))
   )
 
 (define interpret2
-  (lambda (filename)
+  (lambda (parsed)
     (call/cc (lambda (return)
-    (interpreter filename newstate newbreak newcontinue newthrow return)))
+    (interpreter parsed newstate newbreak newcontinue newthrow return)))
     )
   )
 
@@ -68,6 +68,12 @@
   (lambda (m)
     (cond ((not (pair? m)) '())
           (else (cons (cdr (car m)) (remain (cdr m)))))
+  )
+)
+
+(define combine
+  (lambda (m1 m2)
+      (cons (cons (car m1) (car m2)) (list (flatten (cons (cdr m1) (cdr m2)))))
   )
 )
 
@@ -192,11 +198,11 @@
 ;  )
 ;)
 
-;(define isfunc
-;  (lambda (name s)
-;    (> (howmany (lookup name s)) 1)
-;  )
-;)
+(define isfunc
+  (lambda (name s)
+    (> (howmany (lookup name s)) 1)
+  )
+)
 
 
 
@@ -341,6 +347,8 @@
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
         ((eq? 'funcall  (operator expression)) (m_call_func expression s))
         ((eq? 'class  (operator expression)) (m_declare_class expression s))
+        ((eq? 'dot (operator expression)) (dothandler expression s))
+        ((eq? 'new (operator expression)) (create_object expression s))
 
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
@@ -378,6 +386,9 @@
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
         ((eq? 'funcall  (operator expression)) (m_call_func expression s))
+        ((eq? 'static-function (operator expression)) (m_declare_func expression s))
+        ((eq? 'dot (operator expression)) (dothandler expression s))
+        ((eq? 'new (operator expression)) (create_object expression s))
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value_scope (m_value_scope (operand2 expression) s name) (m_state_funcscope expression s name) name)))
         ((eq? '+ (operator expression)) (+ (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
@@ -446,8 +457,9 @@
       (cond
         
         ((eq? (cadr line) 'state) (return state))
-        
-        ( (eq? (operator line) 'var) (m_declare line state))
+
+
+        ((eq? (operator line) 'var) (m_declare line state))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
         ((eq? (operator line) '=) (m_state line state))
         ;return needs revamp (immediate break)
@@ -850,10 +862,12 @@
 ;----------------------------------------------class-------------------------------------------------------
 ;-----------------------------------------------------------------------------------------------------------
 
+
 ; (class class_name extends body)
 
 (define m_declare_class
   (lambda (line state)
+
     (m_declare_func line state)
   )
 )
@@ -871,12 +885,33 @@
 
 (define process_classes
   (lambda (state)
-    1
+    (cond 
+      ((empty? (car state)) state)
+      ((isfunc (caar state) state) (if (box? (itemn (lookup (caar state) state) 3))
+        (combine (extract state) (process_classes (remain state)))
+        (begin (set-box! (lookupbox (caar state) state) 
+          (cons (itemn (lookup (caar state) state) 1) 
+          (cons (itemn (lookup (caar state) state) 2) 
+          (list (box (interpret2 (itemn (lookup (caar state) state) 3))))))) (combine (extract state) (process_classes (remain state))))
+      ))
+      (else (combine (extract state) (process_classes (remain state))))
+    )
   )
 )
 
+;run the main func in last defined class (has to be the case)
+
+;scoping not quite right yet
+(define m_run_main
+  (lambda (state)
+    (call/cc (lambda (return)
+    (begin (set-box! (itemn (lookup (last (car state)) state) 3) (callmain (unbox (itemn (lookup (last (car state)) state) 3)))) state)))
+  )
+)
+
+
 (define m_run_class
-  (lambda (classname state)
+  (lambda (state)
     ;(lookup)
     1
   )
@@ -884,7 +919,7 @@
 
 ;no constructor yet (new A())
 (define create_object
-  (lambda (classname state)
+  (lambda (line state)
     1
   )
 )
