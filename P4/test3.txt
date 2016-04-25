@@ -3,7 +3,7 @@ class A {
   var x = 100;
 
   function add(x) {
-  	var state;
+
     return this.x + x;
   }
 

@@ -154,6 +154,15 @@
   )
 )
 
+(define lookupfieldbox
+    (lambda (name instance s)
+      (if (inscope? instance s)
+        (lookupbox name (unbox (getinstancefieldlist instance s)))
+        (lookupfieldbox name instance (cdr s))
+      )
+  )
+)
+
 
 ;lookup cdr until state where func is declread in
 (define lookupforfunc
@@ -221,20 +230,21 @@
       )
   )
 
+;wtf can't setbox, have to do it manually
 (define m_state_funcscope
-  (lambda (expression s name)
+  (lambda (expression s name instance)
     (if (eq? name null)
       (m_state expression s)
-      (if (eq? (lookupforfunc (cadr expression) s name) "undefined")
-          (error 'error "Use before declaration")
-          (if (layered s)
-            (begin (set-box! (lookupbox (cadr expression) s) (m_value_scope (caddr expression) s name)) s)
-            (begin (set-box! (lookupbox (cadr expression) s) (m_value_scope (caddr expression) s name)) s)
-          )
+      (if (eq? (caadr expression) 'dot)
+        (begin (set-box! (lookupfieldbox (itemn (cadr expression) 3) instance s) (m_value_scope (caddr expression) s name instance)) s)
+        (if (eq? (lookupforfunc (cadr expression) s name) "undefined")
+          (error (cadr expression) "Use before declaration")
+          (begin (set-box! (lookupbox (cadr expression) s) (m_value_scope (caddr expression) s name instance)) s)
         )
-    )
       )
+    )
   )
+)
 
 (define set_func_scope
   (lambda (funcname scope s)
@@ -347,7 +357,7 @@
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
         ((eq? 'funcall  (operator expression)) (m_call_func 'main expression s))
         ((eq? 'class  (operator expression)) (m_declare_class expression s))
-        ((eq? 'dot (operator expression)) (dothandler expression s))
+        ((eq? 'dot (operator expression)) (dothandler expression s 'null))
         ((eq? 'new (operator expression)) (create_object expression s))
 
 
@@ -375,7 +385,7 @@
 
 ;name tracking version
 (define m_value_scope
-  (lambda (expression s name)
+  (lambda (expression s name instance)
     ;(if (layered s) (m_value_scope expression (car s))
       (cond
         ((eq? 'null expression) 'null) ;for declaration of a new variable
@@ -388,26 +398,26 @@
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
         ((eq? 'funcall  (operator expression)) (m_call_func name expression s))
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
-        ((eq? 'dot (operator expression)) (dothandler expression s))
+        ((eq? 'dot (operator expression)) (dothandler expression s instance))
         ((eq? 'new (operator expression)) (create_object expression s))
 
-        ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value_scope (m_value_scope (operand2 expression) s name) (m_state_funcscope expression s name) name)))
-        ((eq? '+ (operator expression)) (+ (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
+        ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value_scope (m_value_scope (operand2 expression) s name instance) (m_state_funcscope expression s name instance) name instance)))
+        ((eq? '+ (operator expression)) (+ (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
         ((eq? '- (operator expression)) (if (null? (cddr expression))
-                                            (- 0 (m_value_scope (operand1 expression) s name))
-                                            (- (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name))))
-        ((eq? '* (operator expression)) (* (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '/ (operator expression)) (quotient (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '% (operator expression)) (remainder (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '== (operator expression)) (eq? (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '!= (operator expression)) (not (eq? (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name))))
-        ((eq? '> (operator expression)) (> (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '>= (operator expression)) (>= (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '< (operator expression)) (< (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '<= (operator expression)) (<= (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '&& (operator expression)) (and (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '|| (operator expression)) (or (m_value_scope (operand1 expression) s name) (m_value_scope (operand2 expression) s name)))
-        ((eq? '! (logicsymbol expression)) (not (m_value_scope (operand1 expression) s name)))
+                                            (- 0 (m_value_scope (operand1 expression) s name instance))
+                                            (- (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance))))
+        ((eq? '* (operator expression)) (* (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '/ (operator expression)) (quotient (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '% (operator expression)) (remainder (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '== (operator expression)) (eq? (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '!= (operator expression)) (not (eq? (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance))))
+        ((eq? '> (operator expression)) (> (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '>= (operator expression)) (>= (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '< (operator expression)) (< (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '<= (operator expression)) (<= (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '&& (operator expression)) (and (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '|| (operator expression)) (or (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
+        ((eq? '! (logicsymbol expression)) (not (m_value_scope (operand1 expression) s name instance)))
         (else expression)) 
         ;(else (error expression "unknown"))) 
     ;)
@@ -426,11 +436,11 @@
             (whilehandler line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
 
 (define whilehandler_scope
-  (lambda (name line state throw return)
+  (lambda (name line state throw return instance)
     (call/cc (lambda (break)
-          (if (not (m_value_scope (cadr line) state name))
+          (if (not (m_value_scope (cadr line) state name instance))
             (break state)
-            (whilehandler_scope name line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return))))))
+            (whilehandler_scope name line (call/cc (lambda (continue) (perform (caddr line) state break continue throw return))) throw return instance))))))
 
 
 
@@ -504,7 +514,7 @@
 
 (define perform_with_scope
   ;state here is current scope
-  (lambda (name line state break continue throw return)
+  (lambda (name line state break continue throw return instance)
       (cond
         ((eq? (cadr line) 'state)
          (return (display state)))
@@ -512,20 +522,20 @@
         ((eq? (operator line) 'var) (m_declare_inscope line state))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
         ;x = a in a function scope, if x doesn't exist in func scope, goto global
-        ((eq? (operator line) '=) (m_state_funcscope line state name))
+        ((eq? (operator line) '=) (m_state_funcscope line state name instance))
         ;return needs revamp (immediate break)
         ((or (eq? (operator line) 'return) (eq? (operator line) 'throw)) 
                             (cond
                                     ((eq? (cadr line) 'state) (return state))
                                     ;above line is for debugging
-                                    ((eq? (return (m_value_scope (cadr line) state name)) #t) (display 'true))
-                                    ((eq? (return (m_value_scope (cadr line) state name)) #f) (display 'false))
-                                    (else (display (return (m_value_scope (cadr line) state name))))
+                                    ((eq? (return (m_value_scope (cadr line) state name instance)) #t) (display 'true))
+                                    ((eq? (return (m_value_scope (cadr line) state name instance)) #f) (display 'false))
+                                    (else (display (return (m_value_scope (cadr line) state name instance))))
                                     ))
 
 
-        ((eq? (operator line) 'if) (ifhandler_scope name line state break continue throw return))
-        ((eq? (operator line) 'while) (whilehandler_scope name line state throw return)) 
+        ((eq? (operator line) 'if) (ifhandler_scope name line state break continue throw return instance))
+        ((eq? (operator line) 'while) (whilehandler_scope name line state throw return instance)) 
 
         ((eq? (car line) 'begin) 
            (cdr (blockhandler (cdr line) (cons state state) break continue throw return))
@@ -547,7 +557,7 @@
         ;try catch handling
         ((eq? (operator line) 'try) (tcfhandler line state break continue throw return))
 
-        (else (m_value_scope line state name)) ;functions will be dealt here to M_value
+        (else (m_value_scope line state name instance)) ;functions will be dealt here to M_value
 
       )))
 
@@ -566,7 +576,7 @@
 (define ifhandler_scope
   (lambda (name line state break continue throw return)
     (cond
-      ((eq? (m_value_scope (cadr line) state name) #t) (perform_with_scope name (caddr line) state break continue throw return))
+      ((eq? (m_value_scope (cadr line) state name instance) #t) (perform_with_scope name (caddr line) state break continue throw return))
       ((null? (itemn line 4)) state)
       (else (perform_with_scope name (itemn line 4) state break continue throw return)))))
 
@@ -598,11 +608,11 @@
 
 ;try to perform in the scope
 (define func_blockhandler
-  (lambda (name line s break continue throw return)
+  (lambda (name line s break continue throw return instance)
             (cond 
-              ((empty? (cdr line)) (perform_with_scope name (car line)  s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return)) 
+              ((empty? (cdr line)) (perform_with_scope name (car line)  s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return instance)) 
               (else 
-                (func_blockhandler name (cdr line) (perform_with_scope name (car line)  s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return) break continue throw return)))
+                (func_blockhandler name (cdr line) (perform_with_scope name (car line)  s (lambda (v) (break (cdr v))) (lambda (v) (continue (cdr v))) (lambda (v) (throw (cdr v))) return instance) break continue throw return instance)))
     
     )
   )
@@ -781,15 +791,16 @@
       (lambda (return)
         (perform_func
           name
-          (caddr (dothandler (itemn line 2) state))
+          (caddr (dothandler (itemn line 2) state (cadr (itemn line 2))) )
           ;(set_func_scope (itemn line 2)
            (set_formal_params ;we evaluate the formal parameters
             (cddr line)
-            (cadr (dothandler (itemn line 2) state))
+            (cadr (dothandler (itemn line 2) state (cadr (itemn line 2))))
             state
-            (unbox (car (dothandler (itemn line 2) state))))
+            (unbox (car (dothandler (itemn line 2) state (cadr (itemn line 2))))))
           ;state)
             return
+            (cadr (itemn line 2)) ;instance name
         )      
       )
     )
@@ -799,32 +810,34 @@
 
 
 ; we still need a callmain, it locates the static-func main and runs it
-(define callmain
-  (lambda (state)
-    (call/cc 
-      (lambda (return)
-        (perform_func
-          'main
-          (caddr (lookup 'main state))
-          ;(set_func_scope (itemn line 2)
-          ;(cons '(()())
-            (set_formal_params ;we evaluate the formal parameters
-            '()
-            (cadr (lookup 'main state))
-            state
-            (unbox (car (lookup 'main state))))
-            ;)
-          ;state)
-            return)
-        )      
-      )
-    )
-  )
+;(define callmain
+;  (lambda (state)
+;    (call/cc 
+;      (lambda (return)
+;        (perform_func
+;          'main
+;          (caddr (lookup 'main state))
+;          ;(set_func_scope (itemn line 2)
+;          ;(cons '(()())
+;            (set_formal_params ;we evaluate the formal parameters
+;            '()
+;            (cadr (lookup 'main state))
+;            state
+;            (unbox (car (lookup 'main state))))
+;            ;)
+;          ;state)
+;            return
+
+;          )
+;        )      
+;      )
+;    )
+;  )
 
 
 ;running the body of func, it would create a new frame of state and pop off when finishing
 (define perform_func 
-  (lambda (name body state return)
+  (lambda (name body state return instance)
     (cdr 
       (func_blockhandler
         name
@@ -836,6 +849,7 @@
         (lambda (v) (error "continue error"))
         (lambda (v) (error "throw error")) 
         return
+        instance
       )
     )
   )
@@ -944,7 +958,9 @@
             (unbox (car (lookup 'main (unbox (itemn (lookup (last (car state)) state) 3))))))
             ;)
           ;state)
-            return)
+            return
+            (last (car state)) ;instance class of main
+          )
     ))
     ;(begin (set-box! (itemn (lookup (last (car state)) state) 3) (callmain (unbox (itemn (lookup (last (car state)) state) 3)))) state)))
   )
@@ -973,7 +989,9 @@
 
 (define getinstancefieldlist
   (lambda (objname state) 
-    (unbox (cadr (lookup objname state)))
+    (if (eq? "undefined" (lookup objname state))
+      (getinstancefieldlist objname (cdr state))
+     (cadr (lookup objname state)))
   )
 )
 
@@ -984,10 +1002,10 @@
 ; operand1 line : objname     a
 
 (define dothandler
-  (lambda (line state)
+  (lambda (line state instance)
     (cond 
-      ((eq? 'this (operand1 line)) (lookup (operand2 line) (unbox (cadr (lookup (operand1 line) state))))) ;bypass to class field ;not implemented correctly yet
-      ((isfunc (operand2 line) (getinstancefieldlist (operand1 line) state)) (lookup (operand2 line) (getinstancefieldlist (operand1 line) state)))
+      ((eq? 'this (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) )) ;bypass to class field ;not implemented correctly yet
+      ((isfunc (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))) (lookup (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))))
       (else (lookup (operand2 line) (unbox (cadr (lookup (operand1 line) state)))))
     )
   )
