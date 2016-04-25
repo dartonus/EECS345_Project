@@ -257,12 +257,14 @@
         (if (eq? (lookup name s) "undefined")
           (error 'error "Use before declaration")
           (if (layered s)
+            ;(if (isfunc exp s)
+              ;(begin (set-box! (lookupbox name s) exp) s)
             (begin (set-box! (lookupbox name s) (m_value exp (car s))) s)
-            (begin (set-box! (lookupbox name s) (m_value exp s)) s)
+            (begin (set-box! (lookupbox name s) (m_value exp s)) s))
           )
         )
       )
-  )
+  ;)
 
 ; Declares a given variable
 ; (var x) or (var x 3)
@@ -271,14 +273,14 @@
     (if (layered s)
       (cons (if (eq? (car expression) 'var)
           (if (not (null? (cddr expression)))
-            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" 
             (def_null (cadr expression) s);else parse "var x"
           )
           "not valid declare"
         ) (cdr s))
         (if (eq? (car expression) 'var)
           (if (not (null? (cddr expression)))
-            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+            (def_with_value (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" 
             (def_null (cadr expression) s);else parse "var x"
           )
           "not valid declare"
@@ -289,10 +291,10 @@
 
 ;declare a variable in current layer specifically (Do we really need it?)
  (define m_declare_inscope
-   (lambda (expression s)
+   (lambda (expression s name instance)
        (if (eq? (car expression) 'var)
           (if (not (null? (cddr expression)))
-             (def_with_value_local (cadr expression) (m_value (caddr expression) s) s) ;parse "var x (things)" (what about declare booleans?)
+             (def_with_value_local (cadr expression) (m_value_scope (caddr expression) s name instance) s) ;parse "var x (things)" 
              (def_null_local (cadr expression) s);else parse "var x"
            )
            "not valid declare"
@@ -328,7 +330,7 @@
 (define def_null_local
   (lambda (var s) 
     (cond ((not (eq? (lookup var (car s)) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
-          (else (cons (m_insert var 'null (car s)) (cdr s))))
+          (else (cons (m_insert var 'newvar (car s)) (cdr s))))
   )
 )
 
@@ -336,7 +338,7 @@
 (define def_null
   (lambda (var s)
     (cond ((not (eq? (lookup var s) "undefined")) (begin (error 'error "no re-declaring") (s))) ;no re-declaring
-          (else (m_insert var 'null s)))
+          (else (m_insert var 'newvar s)))
   )
 )
 
@@ -346,7 +348,7 @@
   (lambda (expression s)
     ;(if (layered s) (m_value expression (car s))
       (cond
-        ((eq? 'null expression) 'null) ;for declaration of a new variable
+        ((eq? 'newvar expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
         ((eq? 'false expression) #f)
         ((symbol? expression) (if (eq? (lookup expression s) "undefined") (error expression "undefined") (lookup expression s)))
@@ -355,10 +357,10 @@
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
-        ((eq? 'funcall  (operator expression)) (m_call_func 'main expression s))
+        ((eq? 'funcall  (operator expression)) (m_call_func 'main expression s 'lmao))
         ((eq? 'class  (operator expression)) (m_declare_class expression s))
         ((eq? 'dot (operator expression)) (dothandler expression s 'null))
-        ((eq? 'new (operator expression)) (create_object expression s))
+        ((eq? 'new (operator expression)) (create_object expression 'null s))
 
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value (m_value (operand2 expression) s) (m_state expression s))))
@@ -388,7 +390,7 @@
   (lambda (expression s name instance)
     ;(if (layered s) (m_value_scope expression (car s))
       (cond
-        ((eq? 'null expression) 'null) ;for declaration of a new variable
+        ((eq? 'newvar expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
         ((eq? 'false expression) #f)
         ((symbol? expression) (if (eq? (lookupforfunc expression s name) "undefined") (error expression "undefined") (lookupforfunc expression s name)))
@@ -396,10 +398,10 @@
         ((boolean? expression) expression)
 
         ((eq? 'function (operator expression)) (m_declare_func expression s))  ;Functions
-        ((eq? 'funcall  (operator expression)) (m_call_func name expression s))
+        ((eq? 'funcall  (operator expression)) (m_call_func name expression s instance))
         ((eq? 'static-function (operator expression)) (m_declare_func expression s))
         ((eq? 'dot (operator expression)) (dothandler expression s instance))
-        ((eq? 'new (operator expression)) (create_object expression s))
+        ((eq? 'new (operator expression)) (create_object expression 'null s))
 
         ((eq? '= (operator expression)) (if (eq? "undefined" operand2) (error 'error "undefined") (m_value_scope (m_value_scope (operand2 expression) s name instance) (m_state_funcscope expression s name instance) name instance)))
         ((eq? '+ (operator expression)) (+ (m_value_scope (operand1 expression) s name instance) (m_value_scope (operand2 expression) s name instance)))
@@ -519,7 +521,7 @@
         ((eq? (cadr line) 'state)
          (return (display state)))
         
-        ((eq? (operator line) 'var) (m_declare_inscope line state))
+        ((eq? (operator line) 'var) (m_declare_inscope line state name instance))
         ((eq? (operator line) 'throw) (throwhandler line state throw))
         ;x = a in a function scope, if x doesn't exist in func scope, goto global
         ((eq? (operator line) '=) (m_state_funcscope line state name instance))
@@ -786,54 +788,38 @@
 ;now line item 2 would not be the name of the func, but body of the func
 ;not implemented correctly
 (define m_call_func
-  (lambda (name line state)
+  (lambda (name line state instance)
     (call/cc 
       (lambda (return)
         (perform_func
           name
-          (caddr (dothandler (itemn line 2) state (cadr (itemn line 2))) )
+          (caddr (dothandler (itemn line 2) state (getobject (cadr (itemn line 2)) instance state)))
           ;(set_func_scope (itemn line 2)
            (set_formal_params ;we evaluate the formal parameters
             (cddr line)
-            (cadr (dothandler (itemn line 2) state (cadr (itemn line 2))))
+            (cadr (dothandler (itemn line 2) state (getobject (cadr (itemn line 2)) instance state)))
             state
-            (unbox (car (dothandler (itemn line 2) state (cadr (itemn line 2))))))
+            (unbox (car (dothandler (itemn line 2) state (getobject (cadr (itemn line 2)) instance state)))))
           ;state)
             return
-            (cadr (itemn line 2)) ;instance name
+            (getobject (cadr (itemn line 2)) instance state) ;instance name
+            
         )      
       )
     )
   )
 )
 
-
-
-; we still need a callmain, it locates the static-func main and runs it
-;(define callmain
-;  (lambda (state)
-;    (call/cc 
-;      (lambda (return)
-;        (perform_func
-;          'main
-;          (caddr (lookup 'main state))
-;          ;(set_func_scope (itemn line 2)
-;          ;(cons '(()())
-;            (set_formal_params ;we evaluate the formal parameters
-;            '()
-;            (cadr (lookup 'main state))
-;            state
-;            (unbox (car (lookup 'main state))))
-;            ;)
-;          ;state)
-;            return
-
-;          )
-;        )      
-;      )
-;    )
-;  )
-
+(define getobject
+  (lambda (nominalname instance state)
+      (cond
+        ((eq? 'this nominalname) instance) ; like calling this.xxx in instance a
+        ((eq? 'null instance) nominalname) ; like calling a.getX() in main 
+        ((eq? 'super nominalname) (error 'ayy "lmao"))
+        (else instance)
+        )
+    )
+  )
 
 ;running the body of func, it would create a new frame of state and pop off when finishing
 (define perform_func 
@@ -976,14 +962,14 @@
 
 ;no constructor yet (new A)
 (define create_object
-  (lambda (line state)
-    (makeclosure_object (cadr line) (caddr (lookup (cadr line) state)))
+  (lambda (line objectname state)
+    (makeclosure_object (cadr line) objectname (caddr (lookup (cadr line) state)))
   )
 )
 
 (define makeclosure_object
-  (lambda (truetype instancefields)
-    (cons (list truetype) (list instancefields))
+  (lambda (truetype objectname instancefields)
+    (cons (list truetype) (append (list objectname) (list instancefields)))
   )
 )
 
@@ -991,7 +977,7 @@
   (lambda (objname state) 
     (if (eq? "undefined" (lookup objname state))
       (getinstancefieldlist objname (cdr state))
-     (cadr (lookup objname state)))
+     (caddr (lookup objname state)))
   )
 )
 
@@ -1005,13 +991,20 @@
   (lambda (line state instance)
     (cond 
       ((eq? 'this (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) )) ;bypass to class field ;not implemented correctly yet
+      ;((eq? 'new (car (operand1 line))) (lookup (operand2 line)  () ))
+      ((eq? 'super (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) ))
       ((isfunc (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))) (lookup (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))))
-      (else (lookup (operand2 line) (unbox (cadr (lookup (operand1 line) state)))))
+      (else (lookup (operand2 line) (unbox (caddr (lookup (operand1 line) state)))))
     )
   )
 )
 
+;this
+;"this" is almost correct, the variable set-box! set to all of the instances of the same class regardless, might want to do a manual state update rather than set-box!
+
 ;super
 
 
-;this
+
+
+
