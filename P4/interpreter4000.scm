@@ -816,7 +816,7 @@
         ((eq? 'this nominalname) instance) ; like calling this.xxx in instance a
         ((eq? 'null instance) nominalname) ; like calling a.getX() in main 
         ((eq? 'super nominalname) (error 'ayy "lmao"))
-        (else instance)
+        (else nominalname)
         )
     )
   )
@@ -989,13 +989,20 @@
 
 (define dothandler
   (lambda (line state instance)
-    (cond 
-      ((eq? 'this (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) )) ;bypass to class field ;not implemented correctly yet
-      ;((eq? 'new (car (operand1 line))) (lookup (operand2 line)  () ))
-      ((eq? 'super (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) ))
-      ((isfunc (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))) (lookup (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))))
-      (else (lookup (operand2 line) (unbox (caddr (lookup (operand1 line) state)))))
-    )
+
+    (if (list? (operand1 line))
+        (cond
+          ((eq? 'new (car (operand1 line))) (lookup (operand2 line)  (unbox (itemn  (create_object (operand1 line) 'brandnewobject state) 3))))
+          (else (error 'ayy "lmao"))
+        )
+        
+        (cond 
+          ((eq? 'this (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) )) ;bypass to class field ;not implemented correctly yet
+          ((eq? 'super (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) ))
+          ((isfunc (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))) (lookup (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))))
+          (else (lookup (operand2 line) (unbox (caddr (lookup (operand1 line) state)))))
+          )
+       )
   )
 )
 
