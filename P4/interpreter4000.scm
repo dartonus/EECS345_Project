@@ -196,6 +196,17 @@
   )
 )
 
+(define locate_instance_var
+  (lambda (name s instance)
+    (cond
+      ((not (layered s)) (lookup name s)) ;local var?
+      ((eq? "undefined" (lookup name (unbox (getinstancefieldlist instance s)))) 
+        (lookup name  (unbox (getinstancefieldlist instance s)))) ;this.var?    
+      (else (locate_instance_var s (getsuper instance s))) ;super.var?
+    )
+  )
+)
+
 ;return the state where the func is defined in
 
 ;(define func_state
@@ -393,7 +404,13 @@
         ((eq? 'newvar expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
         ((eq? 'false expression) #f)
-        ((symbol? expression) (if (eq? (lookupforfunc expression s name) "undefined") (error expression "undefined") (lookupforfunc expression s name)))
+        ((symbol? expression) (
+          (cond
+            ((not (eq? (lookupforfunc expression s name) "undefined")) (lookupforfunc expression s name))
+            ((not (eq? (locate_instance_var expression s instance) "undefined")) (locate_instance_var expression s instance))
+            (else (error expression "undefined var"))
+            )
+        ))
         ((number? expression) expression)
         ((boolean? expression) expression)
 
@@ -815,7 +832,7 @@
       (cond
         ((eq? 'this nominalname) instance) ; like calling this.xxx in instance a
         ((eq? 'null instance) nominalname) ; like calling a.getX() in main 
-        ((eq? 'super nominalname) (error 'ayy "lmao"))
+        ((eq? 'super nominalname) (getsuper instance state))
         (else nominalname)
         )
     )
@@ -905,7 +922,7 @@
 ; then we run the body of the classes to a state ((x y main) (5 10 mainfuncbody))
 ; '((A) (#&(#&(() ()) () ((x y main) (5 10 (.....))))))
 ; then run the main similar in Part 3
-; after a=new A(); it should gives something like '((A a) (#&(#&(() ()) () ((x y main) (5 10 (.....))))  #&(("truetype is A") ((x y )) (5 10))) ))
+; after a=new A(); it should gives something like '((A a) (#&(#&(() ()) () ((x y main) (5 10 (.....))))  #&(("truetype is A") ((x y )) (5 10))) )) etc
 
 
 ; top level of the state: Raw classes and New objects, no variables; vars must be in a class now.
@@ -953,10 +970,17 @@
 )
 
 
-(define m_run_class
-  (lambda (state)
-    ;(lookup)
-    1
+(define getsuper
+  (lambda (instancename state)
+    (if (list? instancename) ;if we have new A().super rather than var a = new B(); a.super
+      (cond
+      ((empty? (itemn (lookup (cadr instancename) state) 2)) (error (cadr instancename) "has no super"))
+      (else (itemn (lookup (cadr instancename) state) 2)))
+
+      (cond
+      ((empty? (itemn (lookup instancename state) 2)) (error instancename "has no super"))
+      (else (itemn (lookup instancename state) 2)))
+    )
   )
 )
 
@@ -989,7 +1013,7 @@
 
 (define dothandler
   (lambda (line state instance)
-
+    (begin (display instance) ;debugging temporary, tracks instances
     (if (list? (operand1 line))
         (cond
           ((eq? 'new (car (operand1 line))) (lookup (operand2 line)  (unbox (itemn  (create_object (operand1 line) 'brandnewobject state) 3))))
@@ -998,11 +1022,15 @@
         
         (cond 
           ((eq? 'this (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) )) ;bypass to class field ;not implemented correctly yet
-          ((eq? 'super (operand1 line)) (lookup (operand2 line)  (unbox (getinstancefieldlist instance state)) ))
+
+          ((eq? 'super (operand1 line)) 
+            (lookup (operand2 line) (unbox (getinstancefieldlist instance state)))
+          )
+
           ((isfunc (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))) (lookup (operand2 line) (unbox (getinstancefieldlist (operand1 line) state))))
           (else (lookup (operand2 line) (unbox (caddr (lookup (operand1 line) state)))))
           )
-       )
+       ))
   )
 )
 
