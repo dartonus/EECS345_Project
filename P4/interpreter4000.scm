@@ -199,14 +199,17 @@
 (define locate_instance_var
   (lambda (name s instance) ;how to get true type
     (cond
-      ((not (layered s)) (lookup name s)) ;local var?
-      ((eq? "undefined" (lookup name (unbox (getinstancefieldlist instance s)))) 
-        (lookup name  (unbox (getinstancefieldlist instance s)))) ;this.var?    
-      (else (locate_instance_var s (getsuper instance s))) ;super.var?
+      ((not (eq? (lookup name s) "undefined")) (lookup name s))
+        ;local var?
+      (#t (if (eq? "undefined" (lookup name (unbox (getinstancefieldlist instance s)))) 
+          (if (layered s) (locate_instance_var name (cdr s) instance)
+            (locate_instance_var name s (getsuper instance s)))
+        (lookup name (unbox (getinstancefieldlist instance s)))
+        )) ;this.var?    
+      (else (locate_instance_var name s (getsuper instance s))) ;
     )
   )
 )
-
 ;return the state where the func is defined in
 
 ;(define func_state
@@ -406,8 +409,8 @@
         ((eq? 'false expression) #f)
         ((symbol? expression) 
           (cond
-            ((not (eq? (lookupforfunc expression s name) "undefined")) (lookupforfunc expression s name))
             ((not (eq? (locate_instance_var expression s instance) "undefined")) (locate_instance_var expression s instance))
+            ((not (eq? (lookupforfunc expression s name) "undefined")) (lookupforfunc expression s name))
             (else (error expression "undefined var"))
             )
         )
@@ -998,13 +1001,15 @@
 )
 
 (define getinstancefieldlist
-  (lambda (objname state) 
+  (lambda (objname state)
+    (if (list? objname) (if (eq? "undefined" (lookup (cadr objname) state))
+      (getinstancefieldlist (cadr objname) (cdr state))
+     (caddr (lookup (cadr objname) state)))
     (if (eq? "undefined" (lookup objname state))
-      (getinstancefieldlist objname (cdr state))
-     (caddr (lookup objname state)))
+      (getinstancefieldlist objname (cdr  state))
+     (caddr (lookup objname state))))
   )
 )
-
 
 ; (dot a x)
 ; works on fields
@@ -1013,7 +1018,7 @@
 
 (define dothandler
   (lambda (line state instance)
-    (begin (display instance) ;debugging temporary, tracks instances
+    (begin (display "") ;debugging temporary, tracks instances
     (if (list? (operand1 line))
         (cond
           ((eq? 'new (car (operand1 line))) (lookup (operand2 line)  (unbox (itemn  (create_object (operand1 line) 'brandnewobject state) 3))))
