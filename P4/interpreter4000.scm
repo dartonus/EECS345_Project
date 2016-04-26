@@ -197,7 +197,7 @@
 )
 
 (define locate_instance_var
-  (lambda (name s instance)
+  (lambda (name s instance) ;how to get true type
     (cond
       ((not (layered s)) (lookup name s)) ;local var?
       ((eq? "undefined" (lookup name (unbox (getinstancefieldlist instance s)))) 
@@ -404,13 +404,13 @@
         ((eq? 'newvar expression) 'null) ;for declaration of a new variable
         ((eq? 'true expression) #t)
         ((eq? 'false expression) #f)
-        ((symbol? expression) (
+        ((symbol? expression) 
           (cond
             ((not (eq? (lookupforfunc expression s name) "undefined")) (lookupforfunc expression s name))
             ((not (eq? (locate_instance_var expression s instance) "undefined")) (locate_instance_var expression s instance))
             (else (error expression "undefined var"))
             )
-        ))
+        )
         ((number? expression) expression)
         ((boolean? expression) expression)
 
@@ -593,11 +593,11 @@
       (else (perform (itemn line 4) state break continue throw return)))))
 
 (define ifhandler_scope
-  (lambda (name line state break continue throw return)
+  (lambda (name line state break continue throw return instance)
     (cond
-      ((eq? (m_value_scope (cadr line) state name instance) #t) (perform_with_scope name (caddr line) state break continue throw return))
+      ((eq? (m_value_scope (cadr line) state name instance) #t) (perform_with_scope name (caddr line) state break continue throw return instance))
       ((null? (itemn line 4)) state)
-      (else (perform_with_scope name (itemn line 4) state break continue throw return)))))
+      (else (perform_with_scope name (itemn line 4) state break continue throw return instance)))))
 
 
 
